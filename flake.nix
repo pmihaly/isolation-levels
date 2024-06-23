@@ -6,31 +6,19 @@
     treefmt-nix.url = "github:numtide/treefmt-nix";
   };
 
-  outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-      pre-commit-hooks,
-      treefmt-nix,
-    }:
-    flake-utils.lib.eachDefaultSystem (
-      system:
+  outputs = { self, nixpkgs, flake-utils, pre-commit-hooks, treefmt-nix, }:
+    flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         deps = with pkgs; [ go ];
         devDeps = [ ];
 
-        treefmtEval = treefmt-nix.lib.evalModule pkgs (
-          { pkgs, ... }:
-          {
-            projectRootFile = "flake.nix";
-            programs.nixfmt-rfc-style.enable = true;
-            programs.gofmt.enable = true;
-          }
-        );
-      in
-      {
+        treefmtEval = treefmt-nix.lib.evalModule pkgs ({ pkgs, ... }: {
+          projectRootFile = "flake.nix";
+          programs.nixfmt.enable = true;
+          programs.gofmt.enable = true;
+        });
+      in {
         packages.default = pkgs.buildGoModule {
           name = "isolation-levels";
           src = ./.;
@@ -55,6 +43,5 @@
         };
 
         formatter = treefmtEval.config.build.wrapper;
-      }
-    );
+      });
 }
