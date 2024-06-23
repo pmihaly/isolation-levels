@@ -1,7 +1,6 @@
 package main
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -28,19 +27,19 @@ func testDirtyReads(t *testing.T, trPair []Transaction) {
 	t2 := trPair[1]
 
 	beforeCommitted := t1.Get("x")
-	if !reflect.DeepEqual(beforeCommitted, "A") {
+	if beforeCommitted != "A" {
 		t.Errorf("got %v, want %v", beforeCommitted, "A")
 	}
 
 	t2.Set("x", "B")
 	afterUncommitted := t1.Get("x")
-	if !reflect.DeepEqual(afterUncommitted, "A") {
+	if afterUncommitted != "A" {
 		t.Errorf("got %v, want %v", afterUncommitted, "A")
 	}
 
 	t2.Commit()
 	afterCommitted := t1.Get("x")
-	if !reflect.DeepEqual(afterCommitted, "B") {
+	if afterCommitted != "B" {
 		t.Errorf("got %v, want %v", afterCommitted, "B")
 	}
 }
@@ -53,7 +52,7 @@ func testDirtyWrites(t *testing.T, trPair []Transaction) {
 	t2.Set("x", "C")
 
 	beforeCommitted := t1.Get("x")
-	if !reflect.DeepEqual(beforeCommitted, "B") {
+	if beforeCommitted != "B" {
 		t.Errorf("got %v, want %v", beforeCommitted, "B")
 	}
 }

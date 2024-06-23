@@ -1,7 +1,6 @@
 package main
 
 import (
-	"reflect"
 	"testing"
 )
 
@@ -21,25 +20,25 @@ func TestCrud(t *testing.T) {
 func testCrud(t *testing.T, tr Transaction) {
 	value := tr.Get("x")
 
-	if !reflect.DeepEqual(value, EmptyValue()) {
+	if value != EmptyValue() {
 		t.Errorf("got %v, want %v", value, EmptyValue())
 	}
 
 	value = tr.Set("x", "A").Get("x")
 
-	if !reflect.DeepEqual(value, "A") {
+	if value != "A" {
 		t.Errorf("got %v, want %v", value, "A")
 	}
 
 	value = tr.Set("x", "B").Get("x")
 
-	if !reflect.DeepEqual(value, "B") {
+	if value != "B" {
 		t.Errorf("got %v, want %v", value, "B")
 	}
 
 	value = tr.Delete("x").Get("x")
 
-	if !reflect.DeepEqual(value, EmptyValue()) {
+	if value != EmptyValue() {
 		t.Errorf("got %v, want %v", value, EmptyValue())
 	}
 }
@@ -47,13 +46,13 @@ func testCrud(t *testing.T, tr Transaction) {
 func testCommitRollback(t *testing.T, tr Transaction) {
 	value := tr.Set("x", "A").Rollback().Get("x")
 
-	if !reflect.DeepEqual(value, EmptyValue()) {
+	if value != EmptyValue() {
 		t.Errorf("got %v, want %v", value, EmptyValue())
 	}
 
 	value = tr.Set("x", "A").Commit().Get("x")
 
-	if !reflect.DeepEqual(value, "A") {
+	if value != "A" {
 		t.Errorf("got %v, want %v", value, "A")
 	}
 
@@ -64,7 +63,7 @@ func testCommitRollback(t *testing.T, tr Transaction) {
 		Rollback().
 		Get("x")
 
-	if !reflect.DeepEqual(value, "B") {
+	if value != "B" {
 		t.Errorf("got %v, want %v", value, "B")
 	}
 }
