@@ -1,0 +1,34 @@
+name: ci
+on:
+  workflow_dispatch:
+  push:
+
+jobs:
+  build:
+    name: build-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Install nix ❄️
+        uses: DeterminateSystems/nix-installer-action@677cbc8aa1fe7e80b1fd15243ec41d5e0c7e3669
+
+      - name: Cache nix 🧙
+        uses: DeterminateSystems/magic-nix-cache-action@a6e7fb2bdef52db3180e04f8e0ee3b4f12c2bcb9
+
+      - name: Clone project 🔽
+        uses: actions/checkout@96f53100ba2a5449eb71d2e6604bbcd94b9449b5
+        with:
+          fetch-depth: 0
+
+      - name: Lint 🧹
+        run: "nix flake check"
+
+      - name: Build 🏗️
+        run: "nix build"
+
+      - name: Upload result 🔼
+        uses: actions/upload-artifact@a8a3f3ad30e3422c9c7b888a15615d19a852ae32
+        with:
+          name: nix-build-result
+          path: result/
