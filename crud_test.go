@@ -19,29 +19,25 @@ func TestCrud(t *testing.T) {
 }
 
 func testCrud(t *testing.T, tr Transaction) {
-	tr.Get("x")
-	_, value := tr.Get("x")
+	value := tr.Get("x")
 
 	if !reflect.DeepEqual(value, EmptyValue()) {
 		t.Errorf("got %v, want %v", value, EmptyValue())
 	}
 
-	tr.Set("x", "A")
-	_, value = tr.Get("x")
+	value = tr.Set("x", "A").Get("x")
 
 	if !reflect.DeepEqual(value, "A") {
 		t.Errorf("got %v, want %v", value, "A")
 	}
 
-	tr.Set("x", "B")
-	_, value = tr.Get("x")
+	value = tr.Set("x", "B").Get("x")
 
 	if !reflect.DeepEqual(value, "B") {
 		t.Errorf("got %v, want %v", value, "B")
 	}
 
-	tr.Delete("x").Commit()
-	_, value = tr.Get("x")
+	value = tr.Delete("x").Commit().Get("x")
 
 	if !reflect.DeepEqual(value, EmptyValue()) {
 		t.Errorf("got %v, want %v", value, EmptyValue())
@@ -49,20 +45,14 @@ func testCrud(t *testing.T, tr Transaction) {
 }
 
 func testCommitRollback(t *testing.T, tr Transaction) {
-	tr.Set("x", "A")
+	value := tr.Set("x", "A").Rollback().Get("x")
 
-	tr.Rollback()
-
-	_, value := tr.Get("x")
 	if !reflect.DeepEqual(value, EmptyValue()) {
 		t.Errorf("got %v, want %v", value, EmptyValue())
 	}
 
-	tr.Set("x", "A")
+	value = tr.Set("x", "A").Commit().Get("x")
 
-	tr.Commit()
-
-	_, value = tr.Get("x")
 	if !reflect.DeepEqual(value, "A") {
 		t.Errorf("got %v, want %v", value, "A")
 	}

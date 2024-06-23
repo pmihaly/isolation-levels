@@ -35,18 +35,18 @@ func (t *ReadCommitted) Set(key, value string) Transaction {
 	return t
 }
 
-func (t *ReadCommitted) Get(key string) (Transaction, string) {
+func (t *ReadCommitted) Get(key string) string {
 	row, ok := (*t.Data)[key]
 
 	if !ok {
-		return t, EmptyValue()
+		return EmptyValue()
 	}
 
 	if uncommitted, ok := row.UncommittedByTransactionId[t.TransactionId]; ok {
-		return t, uncommitted
+		return uncommitted
 	}
 
-	return t, row.Committed
+	return row.Committed
 }
 
 func (t *ReadCommitted) Delete(key string) Transaction {
@@ -82,7 +82,7 @@ func (t *ReadCommitted) Lock(key string) Transaction {
 	return t
 }
 
-func (t *ReadCommitted) Rollback() {
+func (t *ReadCommitted) Rollback() Transaction {
 	for i := len(t.Operations) - 1; i >= 0; i-- {
 		op := t.Operations[i]
 		row := (*t.Data)[op.Key]
@@ -91,9 +91,11 @@ func (t *ReadCommitted) Rollback() {
 	}
 
 	t.Operations = make([]Operation, 0)
+
+	return t
 }
 
-func (t *ReadCommitted) Commit() {
+func (t *ReadCommitted) Commit() Transaction {
 	for _, op := range t.Operations {
 		row := (*t.Data)[op.Key]
 
@@ -108,4 +110,6 @@ func (t *ReadCommitted) Commit() {
 	}
 
 	t.Operations = make([]Operation, 0)
+
+	return t
 }

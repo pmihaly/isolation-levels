@@ -27,19 +27,19 @@ func testDirtyReads(t *testing.T, trPair []Transaction) {
 	t1 := trPair[0]
 	t2 := trPair[1]
 
-	_, beforeCommitted := t1.Get("x")
+	beforeCommitted := t1.Get("x")
 	if !reflect.DeepEqual(beforeCommitted, "A") {
 		t.Errorf("got %v, want %v", beforeCommitted, "A")
 	}
 
 	t2.Set("x", "B")
-	_, afterUncommitted := t1.Get("x")
+	afterUncommitted := t1.Get("x")
 	if !reflect.DeepEqual(afterUncommitted, "A") {
 		t.Errorf("got %v, want %v", afterUncommitted, "A")
 	}
 
 	t2.Commit()
-	_, afterCommitted := t1.Get("x")
+	afterCommitted := t1.Get("x")
 	if !reflect.DeepEqual(afterCommitted, "B") {
 		t.Errorf("got %v, want %v", afterCommitted, "B")
 	}
@@ -52,7 +52,7 @@ func testDirtyWrites(t *testing.T, trPair []Transaction) {
 	t1.Set("x", "B")
 	t2.Set("x", "C")
 
-	_, beforeCommitted := t1.Get("x")
+	beforeCommitted := t1.Get("x")
 	if !reflect.DeepEqual(beforeCommitted, "B") {
 		t.Errorf("got %v, want %v", beforeCommitted, "B")
 	}

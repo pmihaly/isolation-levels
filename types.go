@@ -34,9 +34,9 @@ func NewRow(key, value string) Row {
 
 type Transaction interface {
 	Set(key string, value string) Transaction
-	Get(key string) (Transaction, string)
+	Get(key string) string
 	Delete(key string) Transaction
 	Lock(key string) Transaction
-	Rollback()
-	Commit()
+	Rollback() Transaction
+	Commit() Transaction
 }
