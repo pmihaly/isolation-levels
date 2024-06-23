@@ -56,8 +56,6 @@ func (t *ReadCommitted) Delete(key string) Transaction {
 		return t
 	}
 
-	delete(row.UncommittedByTransactionId, t.TransactionId)
-
 	t.Operations = append(t.Operations, Operation{
 		Key:       key,
 		FromValue: row.LatestUncommitted,
@@ -65,6 +63,7 @@ func (t *ReadCommitted) Delete(key string) Transaction {
 	})
 
 	row.LatestUncommitted = EmptyValue()
+	row.UncommittedByTransactionId[t.TransactionId] = EmptyValue()
 	(*t.Data)[key] = row
 
 	return t
@@ -86,7 +85,7 @@ func (t *ReadCommitted) Rollback() Transaction {
 	for i := len(t.Operations) - 1; i >= 0; i-- {
 		op := t.Operations[i]
 		row := (*t.Data)[op.Key]
-		delete(row.UncommittedByTransactionId, t.TransactionId)
+		row.UncommittedByTransactionId[t.TransactionId] = op.FromValue
 		(*t.Data)[op.Key] = row
 	}
 
