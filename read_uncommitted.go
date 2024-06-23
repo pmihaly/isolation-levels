@@ -59,11 +59,27 @@ func (t *ReadUncommitted) Delete(key string) Transaction {
 	return t
 }
 
+func (t *ReadUncommitted) Lock(key string) Transaction {
+	row, ok := (*t.Data)[key]
+
+	if !ok {
+		return t
+	}
+	row.IsLocked = true
+	row.ExclusiveLock.Lock()
+	(*t.Data)[key] = row
+	return t
+}
+
 func (t *ReadUncommitted) Rollback() {
 	for i := len(t.Operations) - 1; i >= 0; i-- {
 		op := t.Operations[i]
 		row := (*t.Data)[op.Key]
 		row.Uncommitted = op.FromValue
+		if row.IsLocked {
+			row.ExclusiveLock.Unlock()
+			row.IsLocked = false
+		}
 		(*t.Data)[op.Key] = row
 	}
 
@@ -74,6 +90,10 @@ func (t *ReadUncommitted) Commit() {
 	for _, op := range t.Operations {
 		row := (*t.Data)[op.Key]
 		row.Committed = op.ToValue
+		if row.IsLocked {
+			row.ExclusiveLock.Unlock()
+			row.IsLocked = false
+		}
 		(*t.Data)[op.Key] = row
 	}
 
