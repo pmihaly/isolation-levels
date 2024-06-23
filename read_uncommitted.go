@@ -1,22 +1,22 @@
 package main
 
 type ReadUncommitted struct {
-	TransactionId string
-	Data          *map[string]Row
+	TransactionId TransactionId
+	Data          *Table
 	Operations    []Operation
-	lockedKeys    map[string]interface{}
+	lockedKeys    map[Key]interface{}
 }
 
-func NewReadUncommitted(transactionId string, data *map[string]Row) *ReadUncommitted {
+func NewReadUncommitted(transactionId TransactionId, data *Table) *ReadUncommitted {
 	return &ReadUncommitted{
 		TransactionId: transactionId,
 		Data:          data,
 		Operations:    make([]Operation, 0),
-		lockedKeys:    make(map[string]interface{}),
+		lockedKeys:    make(map[Key]interface{}),
 	}
 }
 
-func (t *ReadUncommitted) Set(key, value string) Transaction {
+func (t *ReadUncommitted) Set(key Key, value Value) Transaction {
 	row, ok := (*t.Data)[key]
 	prevValue := row.LatestUncommitted
 
@@ -36,7 +36,7 @@ func (t *ReadUncommitted) Set(key, value string) Transaction {
 	return t
 }
 
-func (t *ReadUncommitted) Get(key string) string {
+func (t *ReadUncommitted) Get(key Key) Value {
 	row, ok := (*t.Data)[key]
 
 	if !ok {
@@ -46,7 +46,7 @@ func (t *ReadUncommitted) Get(key string) string {
 	return row.LatestUncommitted
 }
 
-func (t *ReadUncommitted) Delete(key string) Transaction {
+func (t *ReadUncommitted) Delete(key Key) Transaction {
 	row, ok := (*t.Data)[key]
 
 	if !ok {
@@ -65,7 +65,7 @@ func (t *ReadUncommitted) Delete(key string) Transaction {
 	return t
 }
 
-func (t *ReadUncommitted) Lock(key string) Transaction {
+func (t *ReadUncommitted) Lock(key Key) Transaction {
 	row, ok := (*t.Data)[key]
 
 	if !ok {

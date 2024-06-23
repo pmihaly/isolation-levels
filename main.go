@@ -7,7 +7,7 @@ import (
 func main() {
 	log.Printf("hello world")
 
-	data := make(map[string]Row)
+	data := make(Table)
 	t := ReadUncommitted{
 		TransactionId: "1",
 		Data:          &data,

@@ -6,7 +6,7 @@ import (
 )
 
 func TestExplicitLockDoesntBlockSubsequentLocks(t *testing.T) {
-	data := &map[string]Row{}
+	data := &Table{}
 
 	NewReadUncommitted("1", data).
 		Lock("x").
@@ -19,7 +19,7 @@ func TestExplicitLockDoesntBlockSubsequentLocks(t *testing.T) {
 }
 
 func TestExplicitLockBlocksOtherTransaction(t *testing.T) {
-	data := &map[string]Row{
+	data := &Table{
 		"x": NewRow("x", "A"),
 	}
 
@@ -28,7 +28,7 @@ func TestExplicitLockBlocksOtherTransaction(t *testing.T) {
 
 	t1.Lock("x").Set("x", "B")
 
-	t2Value := make(chan string)
+	t2Value := make(chan Value)
 	blocked := make(chan bool)
 
 	go func() {

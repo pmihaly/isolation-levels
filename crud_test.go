@@ -6,8 +6,8 @@ import (
 
 func TestCrud(t *testing.T) {
 	transactions := []Transaction{
-		NewReadUncommitted("1", &map[string]Row{}),
-		NewReadCommitted("1", &map[string]Row{}),
+		NewReadUncommitted("1", &Table{}),
+		NewReadCommitted("1", &Table{}),
 	}
 
 	for _, tx := range transactions {

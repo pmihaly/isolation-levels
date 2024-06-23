@@ -4,39 +4,44 @@ import (
 	"sync"
 )
 
-func EmptyValue() string {
+type Key string
+type Value string
+type Table map[Key]Row
+type TransactionId string
+
+func EmptyValue() Value {
 	return "<empty>"
 }
 
 type Operation struct {
-	Key       string
-	FromValue string
-	ToValue   string
+	Key       Key
+	FromValue Value
+	ToValue   Value
 }
 
 type Row struct {
-	Key                        string
-	Committed                  string
-	LatestUncommitted          string
-	UncommittedByTransactionId map[string]string
-	ExclusiveLock              *sync.Mutex
+	Key               Key
+	Committed         Value
+	LatestUncommitted Value
+	UncommittedByTxId map[TransactionId]Value
+	ExclusiveLock     *sync.Mutex
 }
 
-func NewRow(key, value string) Row {
+func NewRow(key Key, value Value) Row {
 	return Row{
-		Key:                        key,
-		Committed:                  value,
-		LatestUncommitted:          EmptyValue(),
-		UncommittedByTransactionId: make(map[string]string),
-		ExclusiveLock:              &sync.Mutex{},
+		Key:               key,
+		Committed:         value,
+		LatestUncommitted: EmptyValue(),
+		UncommittedByTxId: make(map[TransactionId]Value),
+		ExclusiveLock:     &sync.Mutex{},
 	}
 }
 
 type Transaction interface {
-	Set(key string, value string) Transaction
-	Get(key string) string
-	Delete(key string) Transaction
-	Lock(key string) Transaction
+	Set(key Key, value Value) Transaction
+	Get(key Key) Value
+	Delete(key Key) Transaction
+	Lock(key Key) Transaction
 	Rollback() Transaction
 	Commit() Transaction
 }
