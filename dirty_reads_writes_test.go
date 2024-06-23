@@ -6,14 +6,13 @@ import (
 	"testing"
 )
 
-func TestDirtyReads(t *testing.T) {
+func TestDirtyReadsWrites(t *testing.T) {
 	data := &map[string]Row{
 		"x": {
 			Key:           "x",
 			Committed:     "A",
 			Uncommitted:   "A",
 			ExclusiveLock: &sync.Mutex{},
-			IsLocked:      false,
 		},
 	}
 
@@ -26,6 +25,7 @@ func TestDirtyReads(t *testing.T) {
 
 	for _, trPair := range transactionPairs {
 		testDirtyReads(t, trPair)
+		testDirtyWrites(t, trPair)
 	}
 
 }
@@ -50,5 +50,17 @@ func testDirtyReads(t *testing.T, trPair []Transaction) {
 	if !reflect.DeepEqual(afterCommitted, "B") {
 		t.Errorf("got %v, want %v", afterCommitted, "B")
 	}
+}
 
+func testDirtyWrites(t *testing.T, trPair []Transaction) {
+	t1 := trPair[0]
+	t2 := trPair[1]
+
+	t1.Set("x", "B")
+	t2.Set("x", "C")
+
+	_, beforeCommitted := t1.Get("x")
+	if !reflect.DeepEqual(beforeCommitted, "B") {
+		t.Errorf("got %v, want %v", beforeCommitted, "B")
+	}
 }

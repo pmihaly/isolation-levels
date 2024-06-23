@@ -1,5 +1,9 @@
 package main
 
+import (
+	"sync"
+)
+
 type ReadUncommitted struct {
 	TransactionId string
 	Data          *map[string]Row
@@ -23,7 +27,7 @@ func (t *ReadUncommitted) Set(key, value string) Transaction {
 			FromValue: EmptyValue(),
 			ToValue:   value,
 		})
-		(*t.Data)[key] = Row{Key: key, Committed: EmptyValue(), Uncommitted: value}
+		(*t.Data)[key] = Row{Key: key, Committed: EmptyValue(), Uncommitted: value, ExclusiveLock: &sync.Mutex{}}
 		return t
 	}
 
@@ -73,7 +77,7 @@ func (t *ReadUncommitted) Lock(key string) Transaction {
 	if !ok {
 		return t
 	}
-	row.IsLocked = true
+
 	row.ExclusiveLock.Lock()
 	(*t.Data)[key] = row
 	return t
@@ -84,10 +88,6 @@ func (t *ReadUncommitted) Rollback() {
 		op := t.Operations[i]
 		row := (*t.Data)[op.Key]
 		row.Uncommitted = op.FromValue
-		if row.IsLocked {
-			row.ExclusiveLock.Unlock()
-			row.IsLocked = false
-		}
 		(*t.Data)[op.Key] = row
 	}
 
@@ -97,12 +97,12 @@ func (t *ReadUncommitted) Rollback() {
 func (t *ReadUncommitted) Commit() {
 	for _, op := range t.Operations {
 		row := (*t.Data)[op.Key]
+
 		row.Committed = op.ToValue
-		if row.IsLocked {
-			row.ExclusiveLock.Unlock()
-			row.IsLocked = false
-		}
+
+		row.ExclusiveLock.Lock()
 		(*t.Data)[op.Key] = row
+		row.ExclusiveLock.Unlock()
 	}
 
 	t.Operations = make([]Operation, 0)

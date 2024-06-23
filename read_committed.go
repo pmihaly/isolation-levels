@@ -8,7 +8,6 @@ type ReadCommitted struct {
 	TransactionId       string
 	Data                *map[string]Row
 	Operations          []Operation
-	MyLockedKeys        map[string]interface{}
 	MyUncommittedWrites map[string]string
 }
 
@@ -17,7 +16,6 @@ func NewReadCommitted(transactionId string, data *map[string]Row) *ReadCommitted
 		TransactionId:       transactionId,
 		Data:                data,
 		Operations:          make([]Operation, 0),
-		MyLockedKeys:        make(map[string]interface{}),
 		MyUncommittedWrites: make(map[string]string),
 	}
 }
@@ -31,13 +29,9 @@ func (t *ReadCommitted) Set(key, value string) Transaction {
 			FromValue: EmptyValue(),
 			ToValue:   value,
 		})
-		(*t.Data)[key] = Row{Key: key, Committed: EmptyValue(), Uncommitted: value, ExclusiveLock: &sync.Mutex{}, IsLocked: false}
+		(*t.Data)[key] = Row{Key: key, Committed: EmptyValue(), Uncommitted: value, ExclusiveLock: &sync.Mutex{}}
 		t.MyUncommittedWrites[key] = value
 		return t
-	}
-
-	if _, ok := t.MyLockedKeys[key]; !ok {
-		t.Lock(key)
 	}
 
 	t.Operations = append(t.Operations, Operation{
@@ -73,10 +67,6 @@ func (t *ReadCommitted) Delete(key string) Transaction {
 		return t
 	}
 
-	if _, ok := t.MyLockedKeys[key]; !ok {
-		t.Lock(key)
-	}
-
 	if _, ok := t.MyUncommittedWrites[key]; ok {
 		delete(t.MyUncommittedWrites, key)
 	}
@@ -100,13 +90,7 @@ func (t *ReadCommitted) Lock(key string) Transaction {
 		return t
 	}
 
-	if _, ok := t.MyLockedKeys[key]; ok {
-		return t
-	}
-
-	row.IsLocked = true
 	row.ExclusiveLock.Lock()
-	t.MyLockedKeys[key] = nil
 	(*t.Data)[key] = row
 	return t
 }
@@ -116,10 +100,6 @@ func (t *ReadCommitted) Rollback() {
 		op := t.Operations[i]
 		row := (*t.Data)[op.Key]
 		row.Uncommitted = op.FromValue
-		if row.IsLocked {
-			row.ExclusiveLock.Unlock()
-			row.IsLocked = false
-		}
 		(*t.Data)[op.Key] = row
 	}
 
@@ -130,13 +110,13 @@ func (t *ReadCommitted) Rollback() {
 func (t *ReadCommitted) Commit() {
 	for _, op := range t.Operations {
 		row := (*t.Data)[op.Key]
+
 		row.Committed = t.MyUncommittedWrites[op.Key]
 		row.Uncommitted = t.MyUncommittedWrites[op.Key]
-		if row.IsLocked {
-			row.ExclusiveLock.Unlock()
-			row.IsLocked = false
-		}
+
+		row.ExclusiveLock.Lock()
 		(*t.Data)[op.Key] = row
+		row.ExclusiveLock.Unlock()
 	}
 
 	t.Operations = make([]Operation, 0)

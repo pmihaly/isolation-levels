@@ -19,7 +19,6 @@ type Row struct {
 	Committed     string
 	Uncommitted   string
 	ExclusiveLock *sync.Mutex
-	IsLocked      bool
 }
 
 type Transaction interface {
