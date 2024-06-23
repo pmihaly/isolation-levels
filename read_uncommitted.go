@@ -4,6 +4,7 @@ type ReadUncommitted struct {
 	TransactionId string
 	Data          *map[string]Row
 	Operations    []Operation
+	lockedKeys    map[string]interface{}
 }
 
 func NewReadUncommitted(transactionId string, data *map[string]Row) *ReadUncommitted {
@@ -11,6 +12,7 @@ func NewReadUncommitted(transactionId string, data *map[string]Row) *ReadUncommi
 		TransactionId: transactionId,
 		Data:          data,
 		Operations:    make([]Operation, 0),
+		lockedKeys:    make(map[string]interface{}),
 	}
 }
 
@@ -70,8 +72,12 @@ func (t *ReadUncommitted) Lock(key string) Transaction {
 		return t
 	}
 
+	if _, ok := t.lockedKeys[key]; ok {
+		return t
+	}
+
+	t.lockedKeys[key] = nil
 	row.ExclusiveLock.Lock()
-	(*t.Data)[key] = row
 	return t
 }
 
@@ -81,6 +87,11 @@ func (t *ReadUncommitted) Rollback() Transaction {
 		row := (*t.Data)[op.Key]
 		row.LatestUncommitted = op.FromValue
 		(*t.Data)[op.Key] = row
+
+		if _, ok := t.lockedKeys[op.Key]; ok {
+			row.ExclusiveLock.Unlock()
+			delete(t.lockedKeys, op.Key)
+		}
 	}
 
 	t.Operations = make([]Operation, 0)
@@ -94,9 +105,13 @@ func (t *ReadUncommitted) Commit() Transaction {
 
 		row.Committed = op.ToValue
 
-		row.ExclusiveLock.Lock()
+		t.Lock(op.Key)
 		(*t.Data)[op.Key] = row
-		row.ExclusiveLock.Unlock()
+
+		if _, ok := t.lockedKeys[op.Key]; ok {
+			row.ExclusiveLock.Unlock()
+			delete(t.lockedKeys, op.Key)
+		}
 	}
 
 	t.Operations = make([]Operation, 0)

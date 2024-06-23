@@ -56,4 +56,15 @@ func testCommitRollback(t *testing.T, tr Transaction) {
 	if !reflect.DeepEqual(value, "A") {
 		t.Errorf("got %v, want %v", value, "A")
 	}
+
+	value = tr.
+		Set("x", "B").
+		Commit().
+		Set("x", "C").
+		Rollback().
+		Get("x")
+
+	if !reflect.DeepEqual(value, "B") {
+		t.Errorf("got %v, want %v", value, "B")
+	}
 }
