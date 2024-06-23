@@ -15,10 +15,21 @@ type Operation struct {
 }
 
 type Row struct {
-	Key           string
-	Committed     string
-	Uncommitted   string
-	ExclusiveLock *sync.Mutex
+	Key                        string
+	Committed                  string
+	LatestUncommitted          string
+	UncommittedByTransactionId map[string]string
+	ExclusiveLock              *sync.Mutex
+}
+
+func NewRow(key, value string) Row {
+	return Row{
+		Key:                        key,
+		Committed:                  value,
+		LatestUncommitted:          EmptyValue(),
+		UncommittedByTransactionId: make(map[string]string),
+		ExclusiveLock:              &sync.Mutex{},
+	}
 }
 
 type Transaction interface {

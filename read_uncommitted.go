@@ -1,9 +1,5 @@
 package main
 
-import (
-	"sync"
-)
-
 type ReadUncommitted struct {
 	TransactionId string
 	Data          *map[string]Row
@@ -20,24 +16,20 @@ func NewReadUncommitted(transactionId string, data *map[string]Row) *ReadUncommi
 
 func (t *ReadUncommitted) Set(key, value string) Transaction {
 	row, ok := (*t.Data)[key]
+	prevValue := row.LatestUncommitted
 
 	if !ok {
-		t.Operations = append(t.Operations, Operation{
-			Key:       key,
-			FromValue: EmptyValue(),
-			ToValue:   value,
-		})
-		(*t.Data)[key] = Row{Key: key, Committed: EmptyValue(), Uncommitted: value, ExclusiveLock: &sync.Mutex{}}
-		return t
+		row = NewRow(key, value)
+		prevValue = EmptyValue()
 	}
 
 	t.Operations = append(t.Operations, Operation{
 		Key:       key,
-		FromValue: (*t.Data)[key].Uncommitted,
+		FromValue: prevValue,
 		ToValue:   value,
 	})
 
-	row.Uncommitted = value
+	row.LatestUncommitted = value
 	(*t.Data)[key] = row
 	return t
 }
@@ -49,7 +41,7 @@ func (t *ReadUncommitted) Get(key string) (Transaction, string) {
 		return t, EmptyValue()
 	}
 
-	return t, row.Uncommitted
+	return t, row.LatestUncommitted
 }
 
 func (t *ReadUncommitted) Delete(key string) Transaction {
@@ -61,11 +53,11 @@ func (t *ReadUncommitted) Delete(key string) Transaction {
 
 	t.Operations = append(t.Operations, Operation{
 		Key:       key,
-		FromValue: row.Uncommitted,
+		FromValue: row.LatestUncommitted,
 		ToValue:   EmptyValue(),
 	})
 
-	row.Uncommitted = EmptyValue()
+	row.LatestUncommitted = EmptyValue()
 	(*t.Data)[key] = row
 
 	return t
@@ -87,7 +79,7 @@ func (t *ReadUncommitted) Rollback() {
 	for i := len(t.Operations) - 1; i >= 0; i-- {
 		op := t.Operations[i]
 		row := (*t.Data)[op.Key]
-		row.Uncommitted = op.FromValue
+		row.LatestUncommitted = op.FromValue
 		(*t.Data)[op.Key] = row
 	}
 

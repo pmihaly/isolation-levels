@@ -40,7 +40,7 @@ func testCrud(t *testing.T, tr Transaction) {
 		t.Errorf("got %v, want %v", value, "B")
 	}
 
-	tr.Delete("x")
+	tr.Delete("x").Commit()
 	_, value = tr.Get("x")
 
 	if !reflect.DeepEqual(value, EmptyValue()) {

@@ -2,19 +2,12 @@ package main
 
 import (
 	"reflect"
-	"sync"
 	"testing"
 )
 
 func TestDirtyReadsWrites(t *testing.T) {
-	data := &map[string]Row{
-		"x": {
-			Key:           "x",
-			Committed:     "A",
-			Uncommitted:   "A",
-			ExclusiveLock: &sync.Mutex{},
-		},
-	}
+	data := &map[string]Row{}
+	(*data)["x"] = NewRow("x", "A")
 
 	transactionPairs := [][]Transaction{
 		{
