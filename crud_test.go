@@ -6,10 +6,10 @@ import (
 )
 
 func TestCrud(t *testing.T) {
-	transactions := []Transaction{&ReadUncommitted{
-		TransactionId: "1",
-		Data:          &map[string]Row{},
-	}}
+	transactions := []Transaction{
+		NewReadUncommitted("1", &map[string]Row{}),
+		NewReadCommitted("1", &map[string]Row{}),
+	}
 
 	for _, tr := range transactions {
 		testCrud(t, tr)

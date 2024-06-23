@@ -6,6 +6,14 @@ type ReadUncommitted struct {
 	Operations    []Operation
 }
 
+func NewReadUncommitted(transactionId string, data *map[string]Row) *ReadUncommitted {
+	return &ReadUncommitted{
+		TransactionId: transactionId,
+		Data:          data,
+		Operations:    make([]Operation, 0),
+	}
+}
+
 func (t *ReadUncommitted) Set(key, value string) Transaction {
 	row, ok := (*t.Data)[key]
 
