@@ -10,9 +10,9 @@ func TestCrud(t *testing.T) {
 		NewReadCommitted("1", &map[string]Row{}),
 	}
 
-	for _, tr := range transactions {
-		testCrud(t, tr)
-		testCommitRollback(t, tr)
+	for _, tx := range transactions {
+		testCrud(t, tx)
+		testCommitRollback(t, tx)
 	}
 
 }

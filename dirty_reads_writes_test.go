@@ -15,16 +15,16 @@ func TestDirtyReadsWrites(t *testing.T) {
 		},
 	}
 
-	for _, trPair := range transactionPairs {
-		testDirtyReads(t, trPair)
-		testDirtyWrites(t, trPair)
+	for _, txPair := range transactionPairs {
+		testDirtyReads(t, txPair)
+		testDirtyWrites(t, txPair)
 	}
 
 }
 
-func testDirtyReads(t *testing.T, trPair []Transaction) {
-	t1 := trPair[0]
-	t2 := trPair[1]
+func testDirtyReads(t *testing.T, txPair []Transaction) {
+	t1 := txPair[0]
+	t2 := txPair[1]
 
 	beforeCommitted := t1.Get("x")
 	if beforeCommitted != "A" {
@@ -44,9 +44,9 @@ func testDirtyReads(t *testing.T, trPair []Transaction) {
 	}
 }
 
-func testDirtyWrites(t *testing.T, trPair []Transaction) {
-	t1 := trPair[0]
-	t2 := trPair[1]
+func testDirtyWrites(t *testing.T, txPair []Transaction) {
+	t1 := txPair[0]
+	t2 := txPair[1]
 
 	t1.Set("x", "B")
 	t2.Set("x", "C")
