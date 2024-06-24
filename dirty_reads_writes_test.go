@@ -6,7 +6,7 @@ import (
 
 func TestDirtyReadsWrites(t *testing.T) {
 	table := NewTable()
-	table.SetRow("x", NewRow("x", "A"))
+	table.Data["x"] = NewRow("x", "A")
 
 	transactionPairs := [][]Transaction{
 		{

@@ -20,7 +20,7 @@ func TestExplicitLockDoesntBlockSubsequentLocks(t *testing.T) {
 
 func TestExplicitLockBlocksOtherTransaction(t *testing.T) {
 	table := NewTable()
-	table.SetRow("x", NewRow("x", "A"))
+	table.Data["x"] = NewRow("x", "A")
 
 	t1 := NewReadUncommitted("1", &table)
 	t2 := NewReadUncommitted("2", &table)

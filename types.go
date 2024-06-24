@@ -37,22 +37,35 @@ func NewRow(key Key, value Value) Row {
 }
 
 type Table struct {
-	data map[Key]Row
+	Data map[Key]Row
 }
 
 func NewTable() Table {
 	return Table{
-		data: make(map[Key]Row),
+		Data: make(map[Key]Row),
 	}
 }
 
-func (t *Table) GetRow(key Key) (Row, bool) {
-	row, ok := t.data[key]
-	return row, ok
+func (t *Table) GetCommitted(key Key, txId TransactionId) (Value, bool) {
+	row, ok := t.Data[key]
+	if !ok {
+		return EmptyValue(), false
+	}
+	return row.Committed, true
 }
 
-func (t *Table) SetRow(key Key, row Row) {
-	t.data[key] = row
+func (t *Table) SetCommitted(key Key, value Value, txId TransactionId) {
+	row, ok := t.Data[key]
+
+	if !ok {
+		panic("key not found")
+	}
+
+	row.Committed = value
+	row.LatestUncommitted = value
+	delete(row.UncommittedByTxId, txId)
+
+	t.Data[key] = row
 }
 
 type Transaction interface {
