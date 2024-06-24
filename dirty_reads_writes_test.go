@@ -5,13 +5,13 @@ import (
 )
 
 func TestDirtyReadsWrites(t *testing.T) {
-	data := NewTable()
-	data.SetRow("x", NewRow("x", "A"))
+	table := NewTable()
+	table.SetRow("x", NewRow("x", "A"))
 
 	transactionPairs := [][]Transaction{
 		{
-			NewReadCommitted("1", &data),
-			NewReadCommitted("2", &data),
+			NewReadCommitted("1", &table),
+			NewReadCommitted("2", &table),
 		},
 	}
 

@@ -5,14 +5,14 @@ import (
 )
 
 func TestCrud(t *testing.T) {
-	data := NewTable()
+	table := NewTable()
 	transactions := []Transaction{
-		NewReadUncommitted("1", &data),
-		NewReadCommitted("1", &data),
+		NewReadUncommitted("1", &table),
+		NewReadCommitted("1", &table),
 	}
 
 	for _, tx := range transactions {
-		data = NewTable()
+		table = NewTable()
 		testCrud(t, tx)
 		testCommitRollback(t, tx)
 	}

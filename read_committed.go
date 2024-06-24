@@ -2,22 +2,22 @@ package main
 
 type ReadCommitted struct {
 	TransactionId TransactionId
-	Data          *Table
+	Table         *Table
 	Operations    []Operation
 	lockedKeys    map[Key]interface{}
 }
 
-func NewReadCommitted(transactionId TransactionId, data *Table) *ReadCommitted {
+func NewReadCommitted(transactionId TransactionId, table *Table) *ReadCommitted {
 	return &ReadCommitted{
 		TransactionId: transactionId,
-		Data:          data,
+		Table:         table,
 		Operations:    make([]Operation, 0),
 		lockedKeys:    make(map[Key]interface{}),
 	}
 }
 
 func (t *ReadCommitted) Set(key Key, value Value) Transaction {
-	row, ok := (*t.Data).GetRow(key)
+	row, ok := (*t.Table).GetRow(key)
 	prevValue := row.LatestUncommitted
 
 	if !ok {
@@ -33,12 +33,12 @@ func (t *ReadCommitted) Set(key Key, value Value) Transaction {
 
 	row.LatestUncommitted = value
 	row.UncommittedByTxId[t.TransactionId] = value
-	(*t.Data).SetRow(key, row)
+	(*t.Table).SetRow(key, row)
 	return t
 }
 
 func (t *ReadCommitted) Get(key Key) Value {
-	row, ok := (*t.Data).GetRow(key)
+	row, ok := (*t.Table).GetRow(key)
 
 	if !ok {
 		return EmptyValue()
@@ -52,7 +52,7 @@ func (t *ReadCommitted) Get(key Key) Value {
 }
 
 func (t *ReadCommitted) Delete(key Key) Transaction {
-	row, ok := (*t.Data).GetRow(key)
+	row, ok := (*t.Table).GetRow(key)
 
 	if !ok {
 		return t
@@ -66,13 +66,13 @@ func (t *ReadCommitted) Delete(key Key) Transaction {
 
 	row.LatestUncommitted = EmptyValue()
 	row.UncommittedByTxId[t.TransactionId] = EmptyValue()
-	(*t.Data).SetRow(key, row)
+	(*t.Table).SetRow(key, row)
 
 	return t
 }
 
 func (t *ReadCommitted) Lock(key Key) Transaction {
-	row, ok := (*t.Data).GetRow(key)
+	row, ok := (*t.Table).GetRow(key)
 
 	if !ok {
 		return t
@@ -90,9 +90,9 @@ func (t *ReadCommitted) Lock(key Key) Transaction {
 func (t *ReadCommitted) Rollback() Transaction {
 	for i := len(t.Operations) - 1; i >= 0; i-- {
 		op := t.Operations[i]
-		row, _ := (*t.Data).GetRow(op.Key)
+		row, _ := (*t.Table).GetRow(op.Key)
 		row.UncommittedByTxId[t.TransactionId] = op.FromValue
-		(*t.Data).SetRow(op.Key, row)
+		(*t.Table).SetRow(op.Key, row)
 
 		if _, ok := t.lockedKeys[op.Key]; ok {
 			row.ExclusiveLock.Unlock()
@@ -107,7 +107,7 @@ func (t *ReadCommitted) Rollback() Transaction {
 
 func (t *ReadCommitted) Commit() Transaction {
 	for _, op := range t.Operations {
-		row, _ := (*t.Data).GetRow(op.Key)
+		row, _ := (*t.Table).GetRow(op.Key)
 
 		row.Committed = op.ToValue
 		row.LatestUncommitted = op.ToValue
@@ -115,7 +115,7 @@ func (t *ReadCommitted) Commit() Transaction {
 		delete(row.UncommittedByTxId, t.TransactionId)
 
 		t.Lock(op.Key)
-		(*t.Data).SetRow(op.Key, row)
+		(*t.Table).SetRow(op.Key, row)
 
 		if _, ok := t.lockedKeys[op.Key]; ok {
 			row.ExclusiveLock.Unlock()
