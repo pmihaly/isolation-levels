@@ -13,9 +13,16 @@ func TestDirtyReadsWrites(t *testing.T) {
 			NewReadCommitted("1", &table),
 			NewReadCommitted("2", &table),
 		},
+		{
+			NewSnapshotIsolation("1", &table),
+			NewSnapshotIsolation("2", &table),
+		},
 	}
 
 	for _, txPair := range transactionPairs {
+		table = NewTable()
+		table.Data["x"] = NewRow("x", "A")
+
 		testDirtyReads(t, txPair)
 		testDirtyWrites(t, txPair)
 	}

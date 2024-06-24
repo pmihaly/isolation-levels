@@ -9,6 +9,7 @@ func TestCrud(t *testing.T) {
 	transactions := []Transaction{
 		NewReadUncommitted("1", &table),
 		NewReadCommitted("1", &table),
+		NewSnapshotIsolation("1", &table),
 	}
 
 	for _, tx := range transactions {

@@ -36,22 +36,30 @@ func NewRow(key Key, value Value) Row {
 	}
 }
 
+type Snapshot map[Key]Value
+
 type Table struct {
-	Data map[Key]Row
+	Data      map[Key]Row
+	snapshots map[TransactionId]Snapshot
 }
 
 func NewTable() Table {
 	return Table{
-		Data: make(map[Key]Row),
+		Data:      make(map[Key]Row),
+		snapshots: make(map[TransactionId]Snapshot),
 	}
 }
 
 func (t *Table) GetCommitted(key Key, txId TransactionId) (Value, bool) {
-	row, ok := t.Data[key]
-	if !ok {
-		return EmptyValue(), false
+	if snapshot, ok := t.snapshots[txId]; ok {
+		return snapshot[key], true
 	}
-	return row.Committed, true
+
+	if row, ok := t.Data[key]; ok {
+		return row.Committed, true
+	}
+
+	return EmptyValue(), false
 }
 
 func (t *Table) SetCommitted(key Key, value Value, txId TransactionId) {
@@ -61,11 +69,31 @@ func (t *Table) SetCommitted(key Key, value Value, txId TransactionId) {
 		panic("key not found")
 	}
 
+	for snapshotTxid, snapshot := range t.snapshots {
+		if snapshotTxid == txId {
+			continue
+		}
+
+		if _, ok := snapshot[key]; !ok {
+			t.snapshots[snapshotTxid][key] = row.Committed
+		}
+
+	}
+
 	row.Committed = value
 	row.LatestUncommitted = value
 	delete(row.UncommittedByTxId, txId)
 
 	t.Data[key] = row
+}
+
+func (t *Table) TakeSnapshot(txId TransactionId) {
+	snapshot := make(Snapshot)
+	t.snapshots[txId] = snapshot
+}
+
+func (t *Table) DeleteSnapshot(txId TransactionId) {
+	delete(t.snapshots, txId)
 }
 
 type Transaction interface {
