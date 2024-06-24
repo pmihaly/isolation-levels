@@ -6,7 +6,6 @@ import (
 
 type Key string
 type Value string
-type Table map[Key]Row
 type TransactionId string
 
 func EmptyValue() Value {
@@ -35,6 +34,25 @@ func NewRow(key Key, value Value) Row {
 		UncommittedByTxId: make(map[TransactionId]Value),
 		ExclusiveLock:     &sync.Mutex{},
 	}
+}
+
+type Table struct {
+	data map[Key]Row
+}
+
+func NewTable() Table {
+	return Table{
+		data: make(map[Key]Row),
+	}
+}
+
+func (t *Table) GetRow(key Key) (Row, bool) {
+	row, ok := t.data[key]
+	return row, ok
+}
+
+func (t *Table) SetRow(key Key, row Row) {
+	t.data[key] = row
 }
 
 type Transaction interface {
