@@ -23,7 +23,7 @@ type Row struct {
 	Committed         Value
 	LatestUncommitted Value
 	UncommittedByTxId map[TransactionId]Value
-	ExclusiveLock     *sync.Mutex
+	Lock              *sync.RWMutex
 }
 
 func NewRow(key Key, value Value) Row {
@@ -32,7 +32,7 @@ func NewRow(key Key, value Value) Row {
 		Committed:         value,
 		LatestUncommitted: EmptyValue(),
 		UncommittedByTxId: make(map[TransactionId]Value),
-		ExclusiveLock:     &sync.Mutex{},
+		Lock:              &sync.RWMutex{},
 	}
 }
 
