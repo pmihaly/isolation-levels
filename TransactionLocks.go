@@ -20,8 +20,26 @@ func NewTransactionLocks() *TransactionLocks {
 	}
 }
 
-func (t *TransactionLocks) WLock(row *Row) bool {
-	t.RUnlock(row)
+type LockType int
+
+const (
+	Read LockType = iota
+	Write
+)
+
+func (t *TransactionLocks) Lock(row *Row, lockType LockType) bool {
+	if lockType == Read {
+		if _, ok := t.readLockedKeys[row.Key]; ok {
+			return false
+		}
+
+		row.Lock.RLock()
+		t.readLockedKeys[row.Key] = row.Lock
+
+		return true
+	}
+
+	t.Unlock(row, Read)
 
 	if _, ok := t.writeLockedKeys[row.Key]; ok {
 		return false
@@ -33,33 +51,22 @@ func (t *TransactionLocks) WLock(row *Row) bool {
 	return true
 }
 
-func (t *TransactionLocks) WUnlock(row *Row) {
+func (t *TransactionLocks) Unlock(row *Row, lockType LockType) {
+	if lockType == Read {
+		if _, ok := t.readLockedKeys[row.Key]; !ok {
+			return
+		}
+
+		row.Lock.RUnlock()
+		delete(t.readLockedKeys, row.Key)
+	}
+
 	if _, ok := t.writeLockedKeys[row.Key]; !ok {
 		return
 	}
 
 	row.Lock.Unlock()
 	delete(t.writeLockedKeys, row.Key)
-}
-
-func (t *TransactionLocks) RLock(row *Row) bool {
-	if _, ok := t.readLockedKeys[row.Key]; ok {
-		return false
-	}
-
-	row.Lock.Lock()
-	t.readLockedKeys[row.Key] = row.Lock
-
-	return true
-}
-
-func (t *TransactionLocks) RUnlock(row *Row) {
-	if _, ok := t.readLockedKeys[row.Key]; !ok {
-		return
-	}
-
-	row.Lock.Unlock()
-	delete(t.readLockedKeys, row.Key)
 }
 
 func (t *TransactionLocks) UnlockAll() {

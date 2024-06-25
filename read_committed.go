@@ -25,9 +25,9 @@ func (t *ReadCommitted) Set(key Key, value Value) Transaction {
 		prevValue = EmptyValue()
 	}
 
-	didLock := t.locks.WLock(&row)
+	didLock := t.locks.Lock(&row, Write)
 	if didLock {
-		defer t.locks.WUnlock(&row)
+		defer t.locks.Unlock(&row, Write)
 	}
 
 	t.Operations = append(t.Operations, Operation{
@@ -49,9 +49,9 @@ func (t *ReadCommitted) Get(key Key) Value {
 		return EmptyValue()
 	}
 
-	didLock := t.locks.RLock(&row)
+	didLock := t.locks.Lock(&row, Read)
 	if didLock {
-		defer t.locks.RUnlock(&row)
+		defer t.locks.Unlock(&row, Read)
 	}
 
 	if uncommitted, ok := row.UncommittedByTxId[t.TransactionId]; ok {
@@ -68,9 +68,9 @@ func (t *ReadCommitted) Delete(key Key) Transaction {
 		return t
 	}
 
-	didLock := t.locks.WLock(&row)
+	didLock := t.locks.Lock(&row, Write)
 	if didLock {
-		defer t.locks.WUnlock(&row)
+		defer t.locks.Unlock(&row, Write)
 	}
 
 	t.Operations = append(t.Operations, Operation{
@@ -93,7 +93,7 @@ func (t *ReadCommitted) Lock(key Key) Transaction {
 		return t
 	}
 
-	t.locks.WLock(&row)
+	t.locks.Lock(&row, Write)
 
 	return t
 }
