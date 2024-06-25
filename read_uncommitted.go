@@ -4,7 +4,7 @@ type ReadUncommitted struct {
 	TransactionId TransactionId
 	Table         *Table
 	Operations    []Operation
-	lockedKeys    map[Key]interface{}
+	locks         *TransactionLocks
 }
 
 func NewReadUncommitted(transactionId TransactionId, table *Table) *ReadUncommitted {
@@ -12,7 +12,7 @@ func NewReadUncommitted(transactionId TransactionId, table *Table) *ReadUncommit
 		TransactionId: transactionId,
 		Table:         table,
 		Operations:    make([]Operation, 0),
-		lockedKeys:    make(map[Key]interface{}),
+		locks:         NewTransactionLocks(),
 	}
 }
 
@@ -23,6 +23,11 @@ func (t *ReadUncommitted) Set(key Key, value Value) Transaction {
 	if !ok {
 		row = NewRow(key, value)
 		prevValue = EmptyValue()
+	}
+
+	didLock := t.locks.Lock(&row)
+	if didLock {
+		defer t.locks.Unlock(&row)
 	}
 
 	t.Operations = append(t.Operations, Operation{
@@ -43,6 +48,11 @@ func (t *ReadUncommitted) Get(key Key) Value {
 		return EmptyValue()
 	}
 
+	didLock := t.locks.Lock(&row)
+	if didLock {
+		defer t.locks.Unlock(&row)
+	}
+
 	return row.LatestUncommitted
 }
 
@@ -51,6 +61,11 @@ func (t *ReadUncommitted) Delete(key Key) Transaction {
 
 	if !ok {
 		return t
+	}
+
+	didLock := t.locks.Lock(&row)
+	if didLock {
+		defer t.locks.Unlock(&row)
 	}
 
 	t.Operations = append(t.Operations, Operation{
@@ -72,12 +87,8 @@ func (t *ReadUncommitted) Lock(key Key) Transaction {
 		return t
 	}
 
-	if _, ok := t.lockedKeys[key]; ok {
-		return t
-	}
+	t.locks.Lock(&row)
 
-	t.lockedKeys[key] = nil
-	row.ExclusiveLock.Lock()
 	return t
 }
 
@@ -89,12 +100,7 @@ func (t *ReadUncommitted) Rollback() Transaction {
 		(*t.Table).Data[op.Key] = row
 	}
 
-	for key := range t.lockedKeys {
-		row := (*t.Table).Data[key]
-		row.ExclusiveLock.Unlock()
-		delete(t.lockedKeys, key)
-	}
-
+	t.locks.UnlockAll()
 	t.Operations = make([]Operation, 0)
 
 	return t
@@ -102,16 +108,10 @@ func (t *ReadUncommitted) Rollback() Transaction {
 
 func (t *ReadUncommitted) Commit() Transaction {
 	for _, op := range t.Operations {
-		t.Lock(op.Key)
 		t.Table.SetCommitted(op.Key, op.ToValue, t.TransactionId)
 	}
 
-	for key := range t.lockedKeys {
-		row := (*t.Table).Data[key]
-		row.ExclusiveLock.Unlock()
-		delete(t.lockedKeys, key)
-	}
-
+	t.locks.UnlockAll()
 	t.Operations = make([]Operation, 0)
 
 	return t

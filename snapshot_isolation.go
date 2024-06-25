@@ -4,7 +4,7 @@ type SnapshotIsolation struct {
 	TransactionId TransactionId
 	Table         *Table
 	Operations    []Operation
-	lockedKeys    map[Key]interface{}
+	locks         *TransactionLocks
 }
 
 func NewSnapshotIsolation(transactionId TransactionId, table *Table) *SnapshotIsolation {
@@ -14,7 +14,7 @@ func NewSnapshotIsolation(transactionId TransactionId, table *Table) *SnapshotIs
 		TransactionId: transactionId,
 		Table:         table,
 		Operations:    make([]Operation, 0),
-		lockedKeys:    make(map[Key]interface{}),
+		locks:         NewTransactionLocks(),
 	}
 }
 
@@ -25,6 +25,11 @@ func (t *SnapshotIsolation) Set(key Key, value Value) Transaction {
 	if !ok {
 		row = NewRow(key, value)
 		prevValue = EmptyValue()
+	}
+
+	didLock := t.locks.Lock(&row)
+	if didLock {
+		defer t.locks.Unlock(&row)
 	}
 
 	t.Operations = append(t.Operations, Operation{
@@ -44,6 +49,11 @@ func (t *SnapshotIsolation) Get(key Key) Value {
 
 	if !ok {
 		return EmptyValue()
+	}
+
+	didLock := t.locks.Lock(&row)
+	if didLock {
+		defer t.locks.Unlock(&row)
 	}
 
 	if uncommitted, ok := row.UncommittedByTxId[t.TransactionId]; ok {
@@ -66,6 +76,11 @@ func (t *SnapshotIsolation) Delete(key Key) Transaction {
 		return t
 	}
 
+	didLock := t.locks.Lock(&row)
+	if didLock {
+		defer t.locks.Unlock(&row)
+	}
+
 	t.Operations = append(t.Operations, Operation{
 		Key:       key,
 		FromValue: row.LatestUncommitted,
@@ -86,11 +101,7 @@ func (t *SnapshotIsolation) Lock(key Key) Transaction {
 		return t
 	}
 
-	if _, ok := t.lockedKeys[key]; ok {
-		return t
-	}
-
-	t.lockedKeys[key] = nil
+	t.locks.Lock(&row)
 	row.ExclusiveLock.Lock()
 	return t
 }
@@ -104,12 +115,7 @@ func (t *SnapshotIsolation) Rollback() Transaction {
 		(*t.Table).Data[op.Key] = row
 	}
 
-	for key := range t.lockedKeys {
-		row := (*t.Table).Data[key]
-		row.ExclusiveLock.Unlock()
-		delete(t.lockedKeys, key)
-	}
-
+	t.locks.UnlockAll()
 	t.Table.DeleteSnapshot(t.TransactionId)
 	t.Operations = make([]Operation, 0)
 
@@ -118,16 +124,10 @@ func (t *SnapshotIsolation) Rollback() Transaction {
 
 func (t *SnapshotIsolation) Commit() Transaction {
 	for _, op := range t.Operations {
-		t.Lock(op.Key)
 		t.Table.SetCommitted(op.Key, op.ToValue, t.TransactionId)
 	}
 
-	for key := range t.lockedKeys {
-		row := (*t.Table).Data[key]
-		row.ExclusiveLock.Unlock()
-		delete(t.lockedKeys, key)
-	}
-
+	t.locks.UnlockAll()
 	t.Table.DeleteSnapshot(t.TransactionId)
 	t.Operations = make([]Operation, 0)
 

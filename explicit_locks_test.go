@@ -32,7 +32,7 @@ func TestExplicitLockBlocksOtherTransaction(t *testing.T) {
 
 	go func() {
 		blocked <- true
-		t2Value <- t2.Lock("x").Get("x")
+		t2Value <- t2.Get("x")
 	}()
 
 	<-blocked
