@@ -18,7 +18,11 @@ func NewReadCommitted(transactionId TransactionId, table *Table) *ReadCommitted 
 
 func (t *ReadCommitted) Set(key Key, value Value) Transaction {
 	row, ok := (*t.Table).Data[key]
-	prevValue := row.LatestUncommitted
+	prevValue, prevOk := row.UncommittedByTxId[t.TransactionId]
+
+	if !prevOk {
+		prevValue = row.Committed
+	}
 
 	if !ok {
 		row = NewRow(key, value)
@@ -75,7 +79,7 @@ func (t *ReadCommitted) Delete(key Key) Transaction {
 
 	t.Operations = append(t.Operations, Operation{
 		Key:       key,
-		FromValue: row.LatestUncommitted,
+		FromValue: row.UncommittedByTxId[t.TransactionId],
 		ToValue:   EmptyValue(),
 	})
 

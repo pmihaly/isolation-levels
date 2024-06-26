@@ -20,7 +20,11 @@ func NewSnapshotIsolation(transactionId TransactionId, table *Table) *SnapshotIs
 
 func (t *SnapshotIsolation) Set(key Key, value Value) Transaction {
 	row, ok := (*t.Table).Data[key]
-	prevValue := row.LatestUncommitted
+	prevValue, prevOk := row.UncommittedByTxId[t.TransactionId]
+
+	if !prevOk {
+		prevValue = row.Committed
+	}
 
 	if !ok {
 		row = NewRow(key, value)
@@ -83,7 +87,7 @@ func (t *SnapshotIsolation) Delete(key Key) Transaction {
 
 	t.Operations = append(t.Operations, Operation{
 		Key:       key,
-		FromValue: row.LatestUncommitted,
+		FromValue: row.UncommittedByTxId[t.TransactionId],
 		ToValue:   EmptyValue(),
 	})
 
