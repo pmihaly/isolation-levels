@@ -27,9 +27,16 @@ const (
 	Write
 )
 
-func (t *TransactionLocks) Lock(row *Row, lockType LockType) bool {
+func (t *TransactionLocks) Lock(lockType LockType, row *Row) bool {
+	_, isReadLocked := t.readLockedKeys[row.Key]
+	_, isWriteLocked := t.writeLockedKeys[row.Key]
+
+	if isWriteLocked {
+		return false
+	}
+
 	if lockType == Read {
-		if _, ok := t.readLockedKeys[row.Key]; ok {
+		if isReadLocked {
 			return false
 		}
 
@@ -39,10 +46,10 @@ func (t *TransactionLocks) Lock(row *Row, lockType LockType) bool {
 		return true
 	}
 
-	t.Unlock(row, Read)
-
-	if _, ok := t.writeLockedKeys[row.Key]; ok {
-		return false
+	isUpgradingLock := lockType == Write && isReadLocked
+	if isUpgradingLock {
+		row.Lock.RUnlock()
+		delete(t.readLockedKeys, row.Key)
 	}
 
 	row.Lock.Lock()
@@ -51,22 +58,20 @@ func (t *TransactionLocks) Lock(row *Row, lockType LockType) bool {
 	return true
 }
 
-func (t *TransactionLocks) Unlock(row *Row, lockType LockType) {
-	if lockType == Read {
-		if _, ok := t.readLockedKeys[row.Key]; !ok {
-			return
-		}
+func (t *TransactionLocks) Unlock(row *Row) {
+	_, isReadLocked := t.readLockedKeys[row.Key]
 
+	if isReadLocked {
 		row.Lock.RUnlock()
 		delete(t.readLockedKeys, row.Key)
-	}
-
-	if _, ok := t.writeLockedKeys[row.Key]; !ok {
 		return
 	}
 
-	row.Lock.Unlock()
-	delete(t.writeLockedKeys, row.Key)
+	_, isWriteLocked := t.writeLockedKeys[row.Key]
+	if isWriteLocked {
+		row.Lock.Unlock()
+		delete(t.writeLockedKeys, row.Key)
+	}
 }
 
 func (t *TransactionLocks) UnlockAll() {
