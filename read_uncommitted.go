@@ -17,7 +17,7 @@ func NewReadUncommitted(transactionId TransactionId, table *Table) *ReadUncommit
 }
 
 func (t *ReadUncommitted) Set(key Key, value Value) Transaction {
-	row, ok := (*t.Table).Data[key]
+	row, ok := t.Table.Data[key]
 	prevValue := row.LatestUncommitted
 
 	if !ok {
@@ -25,8 +25,8 @@ func (t *ReadUncommitted) Set(key Key, value Value) Transaction {
 		prevValue = EmptyValue()
 	}
 
-	didLock := t.locks.Lock(&row, Write)
-	if didLock {
+	didILock := t.locks.Lock(&row, Write)
+	if didILock {
 		defer t.locks.Unlock(&row, Write)
 	}
 
@@ -37,19 +37,20 @@ func (t *ReadUncommitted) Set(key Key, value Value) Transaction {
 	})
 
 	row.LatestUncommitted = value
-	(*t.Table).Data[key] = row
+	t.Table.Data[key] = row
+
 	return t
 }
 
 func (t *ReadUncommitted) Get(key Key) Value {
-	row, ok := (*t.Table).Data[key]
+	row, ok := t.Table.Data[key]
 
 	if !ok {
 		return EmptyValue()
 	}
 
-	didLock := t.locks.Lock(&row, Read)
-	if didLock {
+	didILock := t.locks.Lock(&row, Read)
+	if didILock {
 		defer t.locks.Unlock(&row, Read)
 	}
 
@@ -57,14 +58,14 @@ func (t *ReadUncommitted) Get(key Key) Value {
 }
 
 func (t *ReadUncommitted) Delete(key Key) Transaction {
-	row, ok := (*t.Table).Data[key]
+	row, ok := t.Table.Data[key]
 
 	if !ok {
 		return t
 	}
 
-	didLock := t.locks.Lock(&row, Write)
-	if didLock {
+	didILock := t.locks.Lock(&row, Write)
+	if didILock {
 		defer t.locks.Unlock(&row, Write)
 	}
 
@@ -75,13 +76,13 @@ func (t *ReadUncommitted) Delete(key Key) Transaction {
 	})
 
 	row.LatestUncommitted = EmptyValue()
-	(*t.Table).Data[key] = row
+	t.Table.Data[key] = row
 
 	return t
 }
 
 func (t *ReadUncommitted) Lock(key Key) Transaction {
-	row, ok := (*t.Table).Data[key]
+	row, ok := t.Table.Data[key]
 
 	if !ok {
 		return t
@@ -95,9 +96,9 @@ func (t *ReadUncommitted) Lock(key Key) Transaction {
 func (t *ReadUncommitted) Rollback() Transaction {
 	for i := len(t.Operations) - 1; i >= 0; i-- {
 		op := t.Operations[i]
-		row := (*t.Table).Data[op.Key]
+		row := t.Table.Data[op.Key]
 		row.LatestUncommitted = op.FromValue
-		(*t.Table).Data[op.Key] = row
+		t.Table.Data[op.Key] = row
 	}
 
 	t.locks.UnlockAll()

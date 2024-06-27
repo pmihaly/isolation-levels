@@ -17,7 +17,7 @@ func NewReadCommitted(transactionId TransactionId, table *Table) *ReadCommitted 
 }
 
 func (t *ReadCommitted) Set(key Key, value Value) Transaction {
-	row, ok := (*t.Table).Data[key]
+	row, ok := t.Table.Data[key]
 	prevValue, prevOk := row.UncommittedByTxId[t.TransactionId]
 
 	if !prevOk {
@@ -29,8 +29,8 @@ func (t *ReadCommitted) Set(key Key, value Value) Transaction {
 		prevValue = EmptyValue()
 	}
 
-	didLock := t.locks.Lock(&row, Write)
-	if didLock {
+	didILock := t.locks.Lock(&row, Write)
+	if didILock {
 		defer t.locks.Unlock(&row, Write)
 	}
 
@@ -42,19 +42,19 @@ func (t *ReadCommitted) Set(key Key, value Value) Transaction {
 
 	row.LatestUncommitted = value
 	row.UncommittedByTxId[t.TransactionId] = value
-	(*t.Table).Data[key] = row
+	t.Table.Data[key] = row
 	return t
 }
 
 func (t *ReadCommitted) Get(key Key) Value {
-	row, ok := (*t.Table).Data[key]
+	row, ok := t.Table.Data[key]
 
 	if !ok {
 		return EmptyValue()
 	}
 
-	didLock := t.locks.Lock(&row, Read)
-	if didLock {
+	didILock := t.locks.Lock(&row, Read)
+	if didILock {
 		defer t.locks.Unlock(&row, Read)
 	}
 
@@ -66,14 +66,14 @@ func (t *ReadCommitted) Get(key Key) Value {
 }
 
 func (t *ReadCommitted) Delete(key Key) Transaction {
-	row, ok := (*t.Table).Data[key]
+	row, ok := t.Table.Data[key]
 
 	if !ok {
 		return t
 	}
 
-	didLock := t.locks.Lock(&row, Write)
-	if didLock {
+	didILock := t.locks.Lock(&row, Write)
+	if didILock {
 		defer t.locks.Unlock(&row, Write)
 	}
 
@@ -85,13 +85,13 @@ func (t *ReadCommitted) Delete(key Key) Transaction {
 
 	row.LatestUncommitted = EmptyValue()
 	row.UncommittedByTxId[t.TransactionId] = EmptyValue()
-	(*t.Table).Data[key] = row
+	t.Table.Data[key] = row
 
 	return t
 }
 
 func (t *ReadCommitted) Lock(key Key) Transaction {
-	row, ok := (*t.Table).Data[key]
+	row, ok := t.Table.Data[key]
 
 	if !ok {
 		return t
@@ -106,9 +106,9 @@ func (t *ReadCommitted) Rollback() Transaction {
 	for i := len(t.Operations) - 1; i >= 0; i-- {
 		op := t.Operations[i]
 
-		row := (*t.Table).Data[op.Key]
+		row := t.Table.Data[op.Key]
 		row.UncommittedByTxId[t.TransactionId] = op.FromValue
-		(*t.Table).Data[op.Key] = row
+		t.Table.Data[op.Key] = row
 	}
 
 	t.locks.UnlockAll()
