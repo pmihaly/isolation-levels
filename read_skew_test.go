@@ -13,6 +13,10 @@ func TestReadSkew(t *testing.T) {
 			NewSnapshotIsolation("1", &table),
 			NewSnapshotIsolation("2", &table),
 		},
+		{
+			NewTwoPhaseLocking("1", &table),
+			NewTwoPhaseLocking("2", &table),
+		},
 	}
 
 	for _, txPair := range transactionPairs {

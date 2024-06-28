@@ -77,11 +77,11 @@ func (t *TransactionLocks) Unlock(row *Row) {
 func (t *TransactionLocks) UnlockAll() {
 	for key, mutex := range t.readLockedKeys {
 		mutex.RUnlock()
-		delete(t.writeLockedKeys, key)
+		delete(t.readLockedKeys, key)
 	}
 
 	for key, mutex := range t.writeLockedKeys {
 		mutex.Unlock()
-		delete(t.readLockedKeys, key)
+		delete(t.writeLockedKeys, key)
 	}
 }

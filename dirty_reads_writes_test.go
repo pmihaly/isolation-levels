@@ -17,6 +17,11 @@ func TestDirtyReadsWrites(t *testing.T) {
 			NewSnapshotIsolation("1", &table),
 			NewSnapshotIsolation("2", &table),
 		},
+		// todo figure out making these tests concurrent
+		// {
+		// 	NewTwoPhaseLocking("1", &table),
+		// 	NewTwoPhaseLocking("2", &table),
+		// },
 	}
 
 	for _, txPair := range transactionPairs {

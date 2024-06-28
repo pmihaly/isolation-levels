@@ -10,6 +10,7 @@ func TestCrud(t *testing.T) {
 		NewReadUncommitted("1", &table),
 		NewReadCommitted("1", &table),
 		NewSnapshotIsolation("1", &table),
+		NewTwoPhaseLocking("1", &table),
 	}
 
 	for _, tx := range transactions {

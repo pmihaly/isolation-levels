@@ -51,8 +51,8 @@ func NewTable() Table {
 }
 
 func (t *Table) GetCommitted(key Key, txId TransactionId) (Value, bool) {
-	if snapshot, ok := t.snapshots[txId]; ok {
-		return snapshot[key], true
+	if value, ok := t.snapshots[txId][key]; ok {
+		return value, true
 	}
 
 	if row, ok := t.Data[key]; ok {
