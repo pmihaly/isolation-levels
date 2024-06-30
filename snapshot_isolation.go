@@ -5,6 +5,7 @@ type SnapshotIsolation struct {
 	Table         *Table
 	Operations    []Operation
 	locks         *TransactionLocks
+	keysWrittenTo map[Key]struct{}
 }
 
 func NewSnapshotIsolation(transactionId TransactionId, table *Table) *SnapshotIsolation {
@@ -15,6 +16,7 @@ func NewSnapshotIsolation(transactionId TransactionId, table *Table) *SnapshotIs
 		Table:         table,
 		Operations:    make([]Operation, 0),
 		locks:         NewTransactionLocks(),
+		keysWrittenTo: make(map[Key]struct{}),
 	}
 }
 
@@ -31,7 +33,7 @@ func (t *SnapshotIsolation) Set(key Key, value Value) Transaction {
 		prevValue = EmptyValue()
 	}
 
-	didILock := t.locks.Lock(Write, &row)
+	didILock := t.locks.Lock(ReadWrite, &row)
 	if didILock {
 		defer t.locks.Unlock(&row)
 	}
@@ -42,6 +44,7 @@ func (t *SnapshotIsolation) Set(key Key, value Value) Transaction {
 		ToValue:   value,
 	})
 
+	t.keysWrittenTo[key] = struct{}{}
 	row.LatestUncommitted = value
 	row.UncommittedByTxId[t.TransactionId] = value
 	t.Table.Data[key] = row
@@ -80,7 +83,7 @@ func (t *SnapshotIsolation) Delete(key Key) Transaction {
 		return t
 	}
 
-	didILock := t.locks.Lock(Write, &row)
+	didILock := t.locks.Lock(ReadWrite, &row)
 	if didILock {
 		defer t.locks.Unlock(&row)
 	}
@@ -90,6 +93,12 @@ func (t *SnapshotIsolation) Delete(key Key) Transaction {
 		FromValue: row.UncommittedByTxId[t.TransactionId],
 		ToValue:   EmptyValue(),
 	})
+
+	if _, ok := t.keysWrittenTo[key]; ok {
+		delete(t.keysWrittenTo, key)
+	} else {
+		t.keysWrittenTo[key] = struct{}{}
+	}
 
 	row.LatestUncommitted = EmptyValue()
 	row.UncommittedByTxId[t.TransactionId] = EmptyValue()
@@ -105,7 +114,7 @@ func (t *SnapshotIsolation) Lock(key Key) Transaction {
 		return t
 	}
 
-	t.locks.Lock(Write, &row)
+	t.locks.Lock(ReadWrite, &row)
 	return t
 }
 
@@ -121,6 +130,7 @@ func (t *SnapshotIsolation) Rollback() Transaction {
 	t.locks.UnlockAll()
 	t.Table.DeleteSnapshot(t.TransactionId)
 	t.Operations = make([]Operation, 0)
+	t.keysWrittenTo = make(map[Key]struct{})
 
 	return t
 }
@@ -133,6 +143,21 @@ func (t *SnapshotIsolation) Commit() Transaction {
 	t.locks.UnlockAll()
 	t.Table.DeleteSnapshot(t.TransactionId)
 	t.Operations = make([]Operation, 0)
+	t.keysWrittenTo = make(map[Key]struct{})
 
 	return t
+}
+
+func (t *SnapshotIsolation) GetKeysWrittenTo() []Key {
+	res := make([]Key, 0)
+
+	for key := range t.keysWrittenTo {
+		res = append(res, key)
+	}
+
+	return res
+}
+
+func (t *SnapshotIsolation) GetLocks() *TransactionLocks {
+	return t.locks
 }
