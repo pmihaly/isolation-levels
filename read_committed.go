@@ -5,6 +5,7 @@ type ReadCommitted struct {
 	Table         *Table
 	Operations    []Operation
 	locks         *TransactionLocks
+	keysWrittenTo map[Key]struct{}
 }
 
 func NewReadCommitted(transactionId TransactionId, table *Table) *ReadCommitted {
@@ -13,6 +14,7 @@ func NewReadCommitted(transactionId TransactionId, table *Table) *ReadCommitted 
 		Table:         table,
 		Operations:    make([]Operation, 0),
 		locks:         NewTransactionLocks(),
+		keysWrittenTo: make(map[Key]struct{}),
 	}
 }
 
@@ -29,7 +31,7 @@ func (t *ReadCommitted) Set(key Key, value Value) Transaction {
 		prevValue = EmptyValue()
 	}
 
-	didILock := t.locks.Lock(Write, &row)
+	didILock := t.locks.Lock(ReadWrite, &row)
 	if didILock {
 		defer t.locks.Unlock(&row)
 	}
@@ -40,6 +42,7 @@ func (t *ReadCommitted) Set(key Key, value Value) Transaction {
 		ToValue:   value,
 	})
 
+	t.keysWrittenTo[key] = struct{}{}
 	row.LatestUncommitted = value
 	row.UncommittedByTxId[t.TransactionId] = value
 	t.Table.Data[key] = row
@@ -72,7 +75,7 @@ func (t *ReadCommitted) Delete(key Key) Transaction {
 		return t
 	}
 
-	didILock := t.locks.Lock(Write, &row)
+	didILock := t.locks.Lock(ReadWrite, &row)
 	if didILock {
 		defer t.locks.Unlock(&row)
 	}
@@ -82,6 +85,12 @@ func (t *ReadCommitted) Delete(key Key) Transaction {
 		FromValue: row.UncommittedByTxId[t.TransactionId],
 		ToValue:   EmptyValue(),
 	})
+
+	if _, ok := t.keysWrittenTo[key]; ok {
+		delete(t.keysWrittenTo, key)
+	} else {
+		t.keysWrittenTo[key] = struct{}{}
+	}
 
 	row.LatestUncommitted = EmptyValue()
 	row.UncommittedByTxId[t.TransactionId] = EmptyValue()
@@ -97,7 +106,7 @@ func (t *ReadCommitted) Lock(key Key) Transaction {
 		return t
 	}
 
-	t.locks.Lock(Write, &row)
+	t.locks.Lock(ReadWrite, &row)
 
 	return t
 }
@@ -112,7 +121,7 @@ func (t *ReadCommitted) Rollback() Transaction {
 	}
 
 	t.locks.UnlockAll()
-	t.Operations = make([]Operation, 0)
+	t.keysWrittenTo = make(map[Key]struct{})
 
 	return t
 }
@@ -123,7 +132,21 @@ func (t *ReadCommitted) Commit() Transaction {
 	}
 
 	t.locks.UnlockAll()
-	t.Operations = make([]Operation, 0)
+	t.keysWrittenTo = make(map[Key]struct{})
 
 	return t
+}
+
+func (t *ReadCommitted) GetKeysWrittenTo() []Key {
+	res := make([]Key, 0)
+
+	for key := range t.keysWrittenTo {
+		res = append(res, key)
+	}
+
+	return res
+}
+
+func (t *ReadCommitted) GetLocks() *TransactionLocks {
+	return t.locks
 }

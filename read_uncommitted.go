@@ -5,6 +5,7 @@ type ReadUncommitted struct {
 	Table         *Table
 	Operations    []Operation
 	locks         *TransactionLocks
+	keysWrittenTo map[Key]struct{}
 }
 
 func NewReadUncommitted(transactionId TransactionId, table *Table) *ReadUncommitted {
@@ -13,6 +14,7 @@ func NewReadUncommitted(transactionId TransactionId, table *Table) *ReadUncommit
 		Table:         table,
 		Operations:    make([]Operation, 0),
 		locks:         NewTransactionLocks(),
+		keysWrittenTo: make(map[Key]struct{}),
 	}
 }
 
@@ -25,7 +27,7 @@ func (t *ReadUncommitted) Set(key Key, value Value) Transaction {
 		prevValue = EmptyValue()
 	}
 
-	didILock := t.locks.Lock(Write, &row)
+	didILock := t.locks.Lock(ReadWrite, &row)
 	if didILock {
 		defer t.locks.Unlock(&row)
 	}
@@ -36,6 +38,7 @@ func (t *ReadUncommitted) Set(key Key, value Value) Transaction {
 		ToValue:   value,
 	})
 
+	t.keysWrittenTo[key] = struct{}{}
 	row.LatestUncommitted = value
 	t.Table.Data[key] = row
 
@@ -64,7 +67,7 @@ func (t *ReadUncommitted) Delete(key Key) Transaction {
 		return t
 	}
 
-	didILock := t.locks.Lock(Write, &row)
+	didILock := t.locks.Lock(ReadWrite, &row)
 	if didILock {
 		defer t.locks.Unlock(&row)
 	}
@@ -74,6 +77,12 @@ func (t *ReadUncommitted) Delete(key Key) Transaction {
 		FromValue: row.LatestUncommitted,
 		ToValue:   EmptyValue(),
 	})
+
+	if _, ok := t.keysWrittenTo[key]; ok {
+		delete(t.keysWrittenTo, key)
+	} else {
+		t.keysWrittenTo[key] = struct{}{}
+	}
 
 	row.LatestUncommitted = EmptyValue()
 	t.Table.Data[key] = row
@@ -88,7 +97,7 @@ func (t *ReadUncommitted) Lock(key Key) Transaction {
 		return t
 	}
 
-	t.locks.Lock(Write, &row)
+	t.locks.Lock(ReadWrite, &row)
 
 	return t
 }
@@ -103,6 +112,7 @@ func (t *ReadUncommitted) Rollback() Transaction {
 
 	t.locks.UnlockAll()
 	t.Operations = make([]Operation, 0)
+	t.keysWrittenTo = make(map[Key]struct{})
 
 	return t
 }
@@ -114,6 +124,21 @@ func (t *ReadUncommitted) Commit() Transaction {
 
 	t.locks.UnlockAll()
 	t.Operations = make([]Operation, 0)
+	t.keysWrittenTo = make(map[Key]struct{})
 
 	return t
+}
+
+func (t *ReadUncommitted) GetKeysWrittenTo() []Key {
+	res := make([]Key, 0)
+
+	for key := range t.keysWrittenTo {
+		res = append(res, key)
+	}
+
+	return res
+}
+
+func (t *ReadUncommitted) GetLocks() *TransactionLocks {
+	return t.locks
 }

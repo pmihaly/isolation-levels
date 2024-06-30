@@ -11,7 +11,7 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         deps = with pkgs; [ go ];
-        devDeps = [ ];
+        devDeps = with pkgs; [ delve ];
 
         treefmtEval = treefmt-nix.lib.evalModule pkgs ({ pkgs, ... }: {
           projectRootFile = "flake.nix";

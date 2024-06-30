@@ -5,8 +5,18 @@ import (
 )
 
 type Key string
-type Value string
+
+func EmptyKey() Key {
+	return "<empty>"
+}
+
 type TransactionId string
+
+func EmptyTransactionId() TransactionId {
+	return "<empty>"
+}
+
+type Value string
 
 func EmptyValue() Value {
 	return "<empty>"
@@ -23,14 +33,14 @@ type Row struct {
 	Committed         Value
 	LatestUncommitted Value
 	UncommittedByTxId map[TransactionId]Value
-	Lock              *sync.RWMutex
+	Lock              *sync.RWMutex `json:"-"`
 }
 
 func NewRow(key Key, value Value) Row {
 	return Row{
 		Key:               key,
 		Committed:         value,
-		LatestUncommitted: EmptyValue(),
+		LatestUncommitted: value,
 		UncommittedByTxId: make(map[TransactionId]Value),
 		Lock:              &sync.RWMutex{},
 	}
@@ -103,4 +113,100 @@ type Transaction interface {
 	Lock(key Key) Transaction
 	Rollback() Transaction
 	Commit() Transaction
+	GetKeysWrittenTo() []Key
+	GetLocks() *TransactionLocks
+}
+
+type TransactionLevel int
+
+const (
+	readUncommitted TransactionLevel = iota
+	readCommitted
+	snapshotIsolation
+	twoPhaseLocking
+)
+
+type EventType int
+
+const (
+	TableOperation EventType = iota
+)
+
+type OperationType int
+
+const (
+	WriteOperation OperationType = iota
+	ReadOperation
+	Commit
+	Rollback
+	Wait
+)
+
+type TableEvent struct {
+	TxId          TransactionId
+	TxLevel       TransactionLevel
+	OperationType OperationType
+	Key           Key
+	To            Value
+	Position      int
+}
+
+func NewRead(
+	txId TransactionId,
+	txLevel TransactionLevel,
+	key Key,
+) Event {
+	return Event{TableEvent: &TableEvent{
+		TxId:          txId,
+		TxLevel:       txLevel,
+		OperationType: ReadOperation,
+		Key:           key,
+		To:            EmptyValue(),
+	}}
+}
+
+func NewWrite(
+	txId TransactionId,
+	txLevel TransactionLevel,
+	key Key,
+	to Value,
+) Event {
+	return Event{TableEvent: &TableEvent{
+		TxId:          txId,
+		TxLevel:       txLevel,
+		OperationType: WriteOperation,
+		Key:           key,
+		To:            to,
+	}}
+}
+
+func NewCommit(
+	txId TransactionId,
+	txLevel TransactionLevel,
+) Event {
+	return Event{TableEvent: &TableEvent{
+		TxId:          txId,
+		TxLevel:       txLevel,
+		OperationType: Commit,
+		Key:           EmptyKey(),
+		To:            EmptyValue(),
+	}}
+}
+
+func NewRollback(
+	txId TransactionId,
+	txLevel TransactionLevel,
+) Event {
+	return Event{TableEvent: &TableEvent{
+		TxId:          txId,
+		TxLevel:       txLevel,
+		OperationType: Rollback,
+		Key:           EmptyKey(),
+		To:            EmptyValue(),
+	}}
+}
+
+// https://go.dev/play/p/LhJ7tnMoDT4
+type Event struct {
+	*TableEvent
 }

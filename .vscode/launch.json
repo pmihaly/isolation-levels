@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "wip",
+      "type": "go",
+      "request": "launch",
+      "mode": "test",
+      "program": "./${relativeFileDirname}",
+      "arg": ["-test.run", "TestPlayEventsProducingMermaid"]
+    }
+  ]
+}

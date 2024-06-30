@@ -20,14 +20,15 @@ func NewTransactionLocks() *TransactionLocks {
 	}
 }
 
-type LockType int
+type LockLevel int
 
 const (
-	Read LockType = iota
-	Write
+	EmptyLockLevel LockLevel = iota
+	Read
+	ReadWrite
 )
 
-func (t *TransactionLocks) Lock(lockType LockType, row *Row) bool {
+func (t *TransactionLocks) Lock(lockType LockLevel, row *Row) bool {
 	_, isReadLocked := t.readLockedKeys[row.Key]
 	_, isWriteLocked := t.writeLockedKeys[row.Key]
 
@@ -46,7 +47,7 @@ func (t *TransactionLocks) Lock(lockType LockType, row *Row) bool {
 		return true
 	}
 
-	isUpgradingLock := lockType == Write && isReadLocked
+	isUpgradingLock := lockType == ReadWrite && isReadLocked
 	if isUpgradingLock {
 		row.Lock.RUnlock()
 		delete(t.readLockedKeys, row.Key)
@@ -84,4 +85,18 @@ func (t *TransactionLocks) UnlockAll() {
 		mutex.Unlock()
 		delete(t.writeLockedKeys, key)
 	}
+}
+
+func (t *TransactionLocks) GetLockLevels() map[Key]LockLevel {
+	result := make(map[Key]LockLevel)
+
+	for key := range t.readLockedKeys {
+		result[key] = Read
+	}
+
+	for key := range t.writeLockedKeys {
+		result[key] = ReadWrite
+	}
+
+	return result
 }
