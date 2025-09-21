@@ -121,6 +121,7 @@ func (t *ReadCommitted) Rollback() Transaction {
 	}
 
 	t.locks.UnlockAll()
+	t.Operations = make([]Operation, 0)
 	t.keysWrittenTo = make(map[Key]struct{})
 
 	return t
@@ -132,6 +133,7 @@ func (t *ReadCommitted) Commit() Transaction {
 	}
 
 	t.locks.UnlockAll()
+	t.Operations = make([]Operation, 0)
 	t.keysWrittenTo = make(map[Key]struct{})
 
 	return t
