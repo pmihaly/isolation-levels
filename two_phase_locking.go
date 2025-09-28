@@ -9,8 +9,6 @@ type TwoPhaseLocking struct {
 }
 
 func NewTwoPhaseLocking(transactionId TransactionId, table *Table) *TwoPhaseLocking {
-	table.TakeSnapshot(transactionId)
-
 	return &TwoPhaseLocking{
 		TransactionId: transactionId,
 		Table:         table,
@@ -21,6 +19,8 @@ func NewTwoPhaseLocking(transactionId TransactionId, table *Table) *TwoPhaseLock
 }
 
 func (t *TwoPhaseLocking) Set(key Key, value Value) Transaction {
+	t.Table.EnsureSnapshotTaken(t.TransactionId)
+
 	row, ok := t.Table.Data[key]
 	prevValue, prevOk := row.UncommittedByTxId[t.TransactionId]
 
@@ -49,6 +49,8 @@ func (t *TwoPhaseLocking) Set(key Key, value Value) Transaction {
 }
 
 func (t *TwoPhaseLocking) Get(key Key) Value {
+	t.Table.EnsureSnapshotTaken(t.TransactionId)
+
 	row, ok := t.Table.Data[key]
 
 	if !ok {
@@ -71,6 +73,8 @@ func (t *TwoPhaseLocking) Get(key Key) Value {
 }
 
 func (t *TwoPhaseLocking) Delete(key Key) Transaction {
+	t.Table.EnsureSnapshotTaken(t.TransactionId)
+
 	row, ok := t.Table.Data[key]
 
 	if !ok {
@@ -99,6 +103,8 @@ func (t *TwoPhaseLocking) Delete(key Key) Transaction {
 }
 
 func (t *TwoPhaseLocking) Lock(key Key) Transaction {
+	t.Table.EnsureSnapshotTaken(t.TransactionId)
+
 	row, ok := t.Table.Data[key]
 
 	if !ok {

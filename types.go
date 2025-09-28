@@ -97,9 +97,12 @@ func (t *Table) SetCommitted(key Key, value Value, txId TransactionId) {
 	t.Data[key] = row
 }
 
-func (t *Table) TakeSnapshot(txId TransactionId) {
-	snapshot := make(Snapshot)
-	t.snapshots[txId] = snapshot
+func (t *Table) EnsureSnapshotTaken(txId TransactionId) {
+	if _, ok := t.snapshots[txId]; ok {
+		return
+	}
+
+	t.snapshots[txId] = make(Snapshot)
 }
 
 func (t *Table) DeleteSnapshot(txId TransactionId) {

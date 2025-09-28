@@ -9,8 +9,6 @@ type SnapshotIsolation struct {
 }
 
 func NewSnapshotIsolation(transactionId TransactionId, table *Table) *SnapshotIsolation {
-	table.TakeSnapshot(transactionId)
-
 	return &SnapshotIsolation{
 		TransactionId: transactionId,
 		Table:         table,
@@ -21,6 +19,8 @@ func NewSnapshotIsolation(transactionId TransactionId, table *Table) *SnapshotIs
 }
 
 func (t *SnapshotIsolation) Set(key Key, value Value) Transaction {
+	t.Table.EnsureSnapshotTaken(t.TransactionId)
+
 	row, ok := t.Table.Data[key]
 	prevValue, prevOk := row.UncommittedByTxId[t.TransactionId]
 
@@ -52,6 +52,8 @@ func (t *SnapshotIsolation) Set(key Key, value Value) Transaction {
 }
 
 func (t *SnapshotIsolation) Get(key Key) Value {
+	t.Table.EnsureSnapshotTaken(t.TransactionId)
+
 	row, ok := t.Table.Data[key]
 
 	if !ok {
@@ -77,6 +79,8 @@ func (t *SnapshotIsolation) Get(key Key) Value {
 }
 
 func (t *SnapshotIsolation) Delete(key Key) Transaction {
+	t.Table.EnsureSnapshotTaken(t.TransactionId)
+
 	row, ok := t.Table.Data[key]
 
 	if !ok {
@@ -108,6 +112,8 @@ func (t *SnapshotIsolation) Delete(key Key) Transaction {
 }
 
 func (t *SnapshotIsolation) Lock(key Key) Transaction {
+	t.Table.EnsureSnapshotTaken(t.TransactionId)
+
 	row, ok := t.Table.Data[key]
 
 	if !ok {
