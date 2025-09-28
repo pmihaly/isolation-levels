@@ -69,12 +69,7 @@ func (t *SnapshotIsolation) Get(key Key) Value {
 		return uncommitted
 	}
 
-	val, ok := t.Table.GetCommitted(key, t.TransactionId)
-
-	if !ok {
-		return EmptyValue()
-	}
-
+	val, _ := t.Table.GetCommitted(key, t.TransactionId)
 	return val
 }
 
