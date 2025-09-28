@@ -1,9 +1,5 @@
 package main
 
-import (
-	"sync"
-)
-
 type Key string
 
 func EmptyKey() Key {
@@ -33,7 +29,7 @@ type Row struct {
 	Committed         Value
 	LatestUncommitted Value
 	UncommittedByTxId map[TransactionId]Value
-	Lock              *sync.RWMutex `json:"-"`
+	Lock              *TrackableRWMutex `json:"-"`
 }
 
 func NewRow(key Key, value Value) Row {
@@ -42,7 +38,7 @@ func NewRow(key Key, value Value) Row {
 		Committed:         value,
 		LatestUncommitted: value,
 		UncommittedByTxId: make(map[TransactionId]Value),
-		Lock:              &sync.RWMutex{},
+		Lock:              &TrackableRWMutex{},
 	}
 }
 

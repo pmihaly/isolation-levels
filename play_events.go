@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -49,7 +48,7 @@ func PlayEvents(events []Event, table *Table) string {
 	}
 
 	for _, participant := range participants {
-	    mermaid += addPrefixNewline(participant, &mermaidLock)
+		mermaid += addPrefixNewline(participant, &mermaidLock)
 	}
 
 	for key := range rows {
@@ -63,18 +62,21 @@ func PlayEvents(events []Event, table *Table) string {
 		}
 	}
 
-	// transactions := make(sync.Map[TransactionId]Transaction)
 	var transactions sync.Map
 
 	var wg sync.WaitGroup
-	for _, events := range transactionEvents {
+	unblocks := make(map[TransactionId]chan struct{})
+	for txId := range transactionEvents {
+		unblocks[txId] = make(chan struct{})
+	}
+
+	for txId, events := range transactionEvents {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
+			<-unblocks[txId]
 			for _, event := range events {
-				i := event.Position
-
 				txVal, ok := transactions.Load(event.TxId)
 				tx, _ := txVal.(Transaction)
 
@@ -82,20 +84,12 @@ func PlayEvents(events []Event, table *Table) string {
 					switch event.TxLevel {
 					case readUncommitted:
 						tx = NewReadUncommitted(event.TxId, table)
-						log.Print(event.TxId + ".created")
 					case readCommitted:
 						tx = NewReadCommitted(event.TxId, table)
-						log.Print(event.TxId + ".created")
 					case snapshotIsolation:
 						tx = NewSnapshotIsolation(event.TxId, table)
-						x, _ := json.Marshal(table)
-						log.Printf("%v", string(x))
-						log.Print(event.TxId + ".created")
-						// take snapshot
 					case twoPhaseLocking:
 						tx = NewTwoPhaseLocking(event.TxId, table)
-						log.Print(event.TxId + ".created")
-						// take snapshot
 					default:
 						continue
 					}
@@ -105,14 +99,16 @@ func PlayEvents(events []Event, table *Table) string {
 
 				switch event.OperationType {
 				case WriteOperation:
-					log.Print(event.TxId + ".write")
 					if event.Key == EmptyKey() {
 						continue
 					}
 
-					// tx.isBlocked(key) -> bool - add dotted arrow and stepDone
+					row, found := table.Data[event.Key]
 
-					mermaid += addPrefixNewline(string(event.TxId)+" -->> "+string(event.Key)+": set "+string(event.Key)+" = "+string(event.To), &mermaidLock)
+					if found && row.Lock.IsLocked() {
+						mermaid += addPrefixNewline(string(event.TxId)+" -->> "+string(event.Key)+": set "+string(event.Key)+" = "+string(event.To), &mermaidLock)
+					}
+
 					tx.Set(event.Key, event.To)
 					mermaid += addPrefixNewline(string(event.TxId)+" ->> "+string(event.Key)+": set "+string(event.Key)+" = "+string(event.To), &mermaidLock)
 
@@ -136,10 +132,11 @@ func PlayEvents(events []Event, table *Table) string {
 					}
 
 				case ReadOperation:
-					log.Print(event.TxId + ".read")
-					// tx.isBlocked(key) -> bool - add dotted arrow and stepDone
+					row, found := table.Data[event.Key]
 
-					mermaid += addPrefixNewline(string(event.TxId)+" -->> "+string(event.Key)+": get "+string(event.Key), &mermaidLock)
+					if found && row.Lock.IsLocked() {
+						mermaid += addPrefixNewline(string(event.TxId)+" -->> "+string(event.Key)+": get "+string(event.Key), &mermaidLock)
+					}
 
 					tx.Get(event.Key)
 
@@ -159,7 +156,6 @@ func PlayEvents(events []Event, table *Table) string {
 					mermaid += addPrefixNewline(string(event.Key)+" ->> "+string(event.TxId)+": "+string(event.Key)+" = "+string(tx.Get(event.Key)), &mermaidLock)
 
 				case Commit:
-					log.Print(event.TxId + ".commit")
 					keysWrittenTo := tx.GetKeysWrittenTo()
 
 					for _, key := range keysWrittenTo {
@@ -190,10 +186,16 @@ func PlayEvents(events []Event, table *Table) string {
 					}
 				}
 
-				log.Print(string(event.TxId) + "(" + fmt.Sprint(i) + ") finished")
+				// TODO rollback
+				// TODO read from snapshot
 			}
 		}()
 
+	}
+
+	for _, txId := range transactionOrder {
+		close(unblocks[txId])
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	c := make(chan struct{})

@@ -1,22 +1,18 @@
 package main
 
-import (
-	"sync"
-)
-
 type TransactionLock struct {
-	mutex *sync.Mutex
+	mutex *TrackableRWMutex
 }
 
 type TransactionLocks struct {
-	readLockedKeys  map[Key]*sync.RWMutex
-	writeLockedKeys map[Key]*sync.RWMutex
+	readLockedKeys  map[Key]*TrackableRWMutex
+	writeLockedKeys map[Key]*TrackableRWMutex
 }
 
 func NewTransactionLocks() *TransactionLocks {
 	return &TransactionLocks{
-		readLockedKeys:  make(map[Key]*sync.RWMutex),
-		writeLockedKeys: make(map[Key]*sync.RWMutex),
+		readLockedKeys:  make(map[Key]*TrackableRWMutex),
+		writeLockedKeys: make(map[Key]*TrackableRWMutex),
 	}
 }
 
