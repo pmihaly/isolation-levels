@@ -17,7 +17,7 @@ func TestDirtyReadsWrites(t *testing.T) {
 			NewSnapshotIsolation("1", &table),
 			NewSnapshotIsolation("2", &table),
 		},
-		// TODO figure out making these tests concurrent
+		// TODO
 		// {
 		// 	NewTwoPhaseLocking("1", &table),
 		// 	NewTwoPhaseLocking("2", &table),

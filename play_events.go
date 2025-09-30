@@ -186,8 +186,6 @@ func PlayEvents(events []Event, table *Table) string {
 					}
 				}
 
-				// TODO rollback
-				// TODO read from snapshot
 			}
 		}()
 
