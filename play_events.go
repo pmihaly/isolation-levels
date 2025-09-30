@@ -96,6 +96,7 @@ func PlayEvents(events []Event, table *Table) string {
 
 					transactions.Store(event.TxId, tx)
 				}
+				isUsingSnapshots := event.TxLevel >= snapshotIsolation
 
 				switch event.OperationType {
 				case WriteOperation:
@@ -110,6 +111,11 @@ func PlayEvents(events []Event, table *Table) string {
 					}
 
 					tx.Set(event.Key, event.To)
+
+					if isUsingSnapshots {
+						mermaid += addPrefixNewline(string(event.TxId)+" ->> "+string(event.Key)+" snapshot of "+string(event.TxId)+": set "+string(event.Key)+" = "+string(event.To), &mermaidLock)
+					}
+
 					mermaid += addPrefixNewline(string(event.TxId)+" ->> "+string(event.Key)+": set "+string(event.Key)+" = "+string(event.To), &mermaidLock)
 
 					lockLevels := tx.GetLocks().GetLockLevels()
@@ -140,7 +146,16 @@ func PlayEvents(events []Event, table *Table) string {
 
 					tx.Get(event.Key)
 
-					mermaid += addPrefixNewline(string(event.TxId)+" ->> "+string(event.Key)+": get "+string(event.Key), &mermaidLock)
+					readTargetParticipant := string(event.Key)
+
+					snapshots, hasSnapshots := table.GetSnapshot(txId)
+					_, hasSnapshots = snapshots[event.Key]
+
+					if isUsingSnapshots && hasSnapshots {
+						readTargetParticipant = string(event.Key) + " snapshot of " + string(event.TxId)
+					}
+
+					mermaid += addPrefixNewline(string(event.TxId)+" ->> "+readTargetParticipant+": get "+string(event.Key), &mermaidLock)
 
 					lockLevels := tx.GetLocks().GetLockLevels()
 					lockLevel := lockLevels[event.Key]
@@ -153,7 +168,7 @@ func PlayEvents(events []Event, table *Table) string {
 						mermaid += addPrefixNewline("activate "+string(event.Key), &mermaidLock)
 					}
 
-					mermaid += addPrefixNewline(string(event.Key)+" ->> "+string(event.TxId)+": "+string(event.Key)+" = "+string(tx.Get(event.Key)), &mermaidLock)
+					mermaid += addPrefixNewline(readTargetParticipant+" ->> "+string(event.TxId)+": "+string(event.Key)+" = "+string(tx.Get(event.Key)), &mermaidLock)
 
 				case Commit:
 					keysWrittenTo := tx.GetKeysWrittenTo()

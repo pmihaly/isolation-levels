@@ -105,6 +105,11 @@ func (t *Table) DeleteSnapshot(txId TransactionId) {
 	delete(t.snapshots, txId)
 }
 
+func (t *Table) GetSnapshot(txId TransactionId) (Snapshot, bool) {
+	snapshot, ok := t.snapshots[txId]
+	return snapshot, ok
+}
+
 type Transaction interface {
 	Set(key Key, value Value) Transaction
 	Get(key Key) Value
