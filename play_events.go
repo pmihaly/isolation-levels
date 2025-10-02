@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -25,30 +26,19 @@ func PlayEvents(events []Event, table *Table) string {
 		rows[event.Key] = struct{}{}
 	}
 
-	mermaid := "sequenceDiagram\n"
-	mermaidLock := sync.Mutex{}
-
-	participants := []string{string(EmptyTransactionId())}
+	mermaid := NewMermaidBuilder()
+	participants := NewParticipants()
 
 	for row := range rows {
 		if row == EmptyKey() {
 			continue
 		}
 
-		participants = append(participants, "participant "+string(row))
+		participants.EnsureParticipantAdded(string(row), rowParticipant, NO_ALIGNMENT)
 	}
 
-	for i, transactionId := range transactionOrder {
-		if i == 0 {
-			participants[0] = "actor " + string(transactionId)
-			continue
-		}
-
-		participants = append(participants, "actor "+string(transactionId))
-	}
-
-	for _, participant := range participants {
-		mermaid += addPrefixNewline(participant, &mermaidLock)
+	for _, transactionId := range transactionOrder {
+		participants.EnsureParticipantAdded(string(transactionId), transactionParticipant, NO_ALIGNMENT)
 	}
 
 	for key := range rows {
@@ -58,7 +48,7 @@ func PlayEvents(events []Event, table *Table) string {
 		}
 		rowJson, err := json.Marshal(row)
 		if err == nil {
-			mermaid += addPrefixNewline("note over "+string(key)+": "+string(rowJson), &mermaidLock)
+			mermaid.AddNote(string(key), string(rowJson))
 		}
 	}
 
@@ -107,44 +97,48 @@ func PlayEvents(events []Event, table *Table) string {
 					row, found := table.Data[event.Key]
 
 					if found && row.Lock.IsLocked() {
-						mermaid += addPrefixNewline(string(event.TxId)+" -->> "+string(event.Key)+": set "+string(event.Key)+" = "+string(event.To), &mermaidLock)
+						mermaid.AddArrow(dotted, string(event.TxId), string(event.Key), fmt.Sprintf("set %v = %v", event.Key, event.To), asMaterialized)
 					}
 
 					tx.Set(event.Key, event.To)
 
 					if isUsingSnapshots {
-						mermaid += addPrefixNewline(string(event.TxId)+" ->> "+string(event.Key)+" snapshot of "+string(event.TxId)+": set "+string(event.Key)+" = "+string(event.To), &mermaidLock)
+						participants.EnsureParticipantAdded(toSnapshotName(event), snapshotParticipant, NO_ALIGNMENT)
+						mermaid.AddArrow(solid, string(event.TxId), toSnapshotName(event), fmt.Sprintf("set %v = %v", event.Key, event.To), asUnmaterialized)
 					}
 
-					mermaid += addPrefixNewline(string(event.TxId)+" ->> "+string(event.Key)+": set "+string(event.Key)+" = "+string(event.To), &mermaidLock)
+					mermaid.AddArrow(solid, string(event.TxId), string(event.Key), fmt.Sprintf("set %v = %v", event.Key, event.To), asMaterialized)
+					participants.EnsureParticipantAdded(string(event.Key), rowParticipant, NO_ALIGNMENT)
 
 					lockLevels := tx.GetLocks().GetLockLevels()
 					lockLevel := lockLevels[event.Key]
 
+					activationLevel := 0
 					if lockLevel >= Read {
-						mermaid += addPrefixNewline("activate "+string(event.Key), &mermaidLock)
+						activationLevel += 1
 					}
 
 					if lockLevel == ReadWrite {
-						mermaid += addPrefixNewline("activate "+string(event.Key), &mermaidLock)
+						activationLevel += 1
 					}
 
-					mermaid += addPrefixNewline(string(event.Key)+" ->> "+string(event.TxId)+": ok", &mermaidLock)
+					mermaid.EnsureActivatedOnLevel(activationLevel, string(event.Key))
+					mermaid.AddArrow(solid, string(event.Key), string(event.TxId), "ok", asMaterialized)
 
 					row, ok := table.Data[event.Key]
 					rowJson, err := json.Marshal(row)
 					if ok && err == nil {
-						mermaid += addPrefixNewline("note over "+string(event.Key)+": "+string(rowJson), &mermaidLock)
+						mermaid.AddNote(string(event.Key), string(rowJson))
 					}
 
 				case ReadOperation:
 					row, found := table.Data[event.Key]
 
 					if found && row.Lock.IsLocked() {
-						mermaid += addPrefixNewline(string(event.TxId)+" -->> "+string(event.Key)+": get "+string(event.Key), &mermaidLock)
+						mermaid.AddArrow(dotted, string(event.TxId), string(event.Key), ": get "+string(event.Key), asMaterialized)
 					}
 
-					tx.Get(event.Key)
+					value := tx.Get(event.Key)
 
 					readTargetParticipant := string(event.Key)
 
@@ -152,51 +146,36 @@ func PlayEvents(events []Event, table *Table) string {
 					_, hasSnapshots = snapshots[event.Key]
 
 					if isUsingSnapshots && hasSnapshots {
-						readTargetParticipant = string(event.Key) + " snapshot of " + string(event.TxId)
+						readTargetParticipant = toSnapshotName(event)
+						participants.EnsureParticipantAdded(readTargetParticipant, snapshotParticipant, NO_ALIGNMENT)
 					}
 
-					mermaid += addPrefixNewline(string(event.TxId)+" ->> "+readTargetParticipant+": get "+string(event.Key), &mermaidLock)
+					mermaid.AddArrow(solid, string(event.TxId), readTargetParticipant, "get "+string(event.Key), materializeOpposite)
 
 					lockLevels := tx.GetLocks().GetLockLevels()
 					lockLevel := lockLevels[event.Key]
 
 					if lockLevel >= Read {
-						mermaid += addPrefixNewline("activate "+string(event.Key), &mermaidLock)
+						mermaid.EnsureActivatedOnLevel(1, string(event.Key))
 					}
 
-					if lockLevel == ReadWrite {
-						mermaid += addPrefixNewline("activate "+string(event.Key), &mermaidLock)
-					}
-
-					mermaid += addPrefixNewline(readTargetParticipant+" ->> "+string(event.TxId)+": "+string(event.Key)+" = "+string(tx.Get(event.Key)), &mermaidLock)
+					mermaid.AddArrow(solid, string(event.Key), string(event.TxId), fmt.Sprintf("%v = %v", event.Key, value), asMaterialized)
 
 				case Commit:
 					keysTouched := tx.GetKeysTouched()
-
-					for _, key := range keysTouched {
-						mermaid += addPrefixNewline(string(event.TxId)+" ->> "+string(key)+": commit", &mermaidLock)
-					}
-					lockLevels := tx.GetLocks().GetLockLevels()
-
 					tx.Commit()
+					for _, key := range keysTouched {
+						mermaid.AddArrow(solid, string(event.TxId), string(key), "commit", asMaterialized)
+					}
 
 					for _, key := range keysTouched {
-						mermaid += addPrefixNewline(string(key)+" ->> "+string(event.TxId)+": ok", &mermaidLock)
-
-						lockLevel := lockLevels[key]
-
-						if lockLevel >= Read {
-							mermaid += addPrefixNewline("deactivate "+string(key), &mermaidLock)
-						}
-
-						if lockLevel == ReadWrite {
-							mermaid += addPrefixNewline("deactivate "+string(key), &mermaidLock)
-						}
+						mermaid.AddArrow(solid, string(key), string(event.TxId), "ok", asMaterialized)
+						mermaid.EnsureActivatedOnLevel(0, string(key))
 
 						row, ok := table.Data[key]
 						rowJson, err := json.Marshal(row)
 						if ok && err == nil {
-							mermaid += addPrefixNewline("note over "+string(key)+": "+string(rowJson), &mermaidLock)
+							mermaid.AddNote(string(key), string(rowJson))
 						}
 					}
 				}
@@ -217,17 +196,17 @@ func PlayEvents(events []Event, table *Table) string {
 		wg.Wait()
 	}()
 
+	participants.AddToMermaid(mermaid)
+
 	select {
 	case <-c:
-		return mermaid
+		return mermaid.Build()
 	case <-time.After(3 * time.Second):
 		log.Print("timed out after 3 secs")
-		return mermaid
+		return mermaid.Build()
 	}
 }
 
-func addPrefixNewline(mermaid string, mermaidLock *sync.Mutex) string {
-	mermaidLock.Lock()
-	defer mermaidLock.Unlock()
-	return "    " + mermaid + "\n"
+func toSnapshotName(event Event) string {
+	return string(event.Key) + " snapshot of " + string(event.TxId)
 }
