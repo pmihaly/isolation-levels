@@ -5,7 +5,7 @@ type SnapshotIsolation struct {
 	Table         *Table
 	Operations    []Operation
 	locks         *TransactionLocks
-	keysWrittenTo map[Key]struct{}
+	keysTouched   map[Key]struct{}
 }
 
 func NewSnapshotIsolation(transactionId TransactionId, table *Table) *SnapshotIsolation {
@@ -14,7 +14,7 @@ func NewSnapshotIsolation(transactionId TransactionId, table *Table) *SnapshotIs
 		Table:         table,
 		Operations:    make([]Operation, 0),
 		locks:         NewTransactionLocks(),
-		keysWrittenTo: make(map[Key]struct{}),
+		keysTouched:   make(map[Key]struct{}),
 	}
 }
 
@@ -44,7 +44,7 @@ func (t *SnapshotIsolation) Set(key Key, value Value) Transaction {
 		ToValue:   value,
 	})
 
-	t.keysWrittenTo[key] = struct{}{}
+	t.keysTouched[key] = struct{}{}
 	row.LatestUncommitted = value
 	row.UncommittedByTxId[t.TransactionId] = value
 	t.Table.Data[key] = row
@@ -64,6 +64,8 @@ func (t *SnapshotIsolation) Get(key Key) Value {
 	if didILock {
 		defer t.locks.Unlock(&row)
 	}
+
+	t.keysTouched[key] = struct{}{}
 
 	if uncommitted, ok := row.UncommittedByTxId[t.TransactionId]; ok {
 		return uncommitted
@@ -93,10 +95,10 @@ func (t *SnapshotIsolation) Delete(key Key) Transaction {
 		ToValue:   EmptyValue(),
 	})
 
-	if _, ok := t.keysWrittenTo[key]; ok {
-		delete(t.keysWrittenTo, key)
+	if _, ok := t.keysTouched[key]; ok {
+		delete(t.keysTouched, key)
 	} else {
-		t.keysWrittenTo[key] = struct{}{}
+		t.keysTouched[key] = struct{}{}
 	}
 
 	row.LatestUncommitted = EmptyValue()
@@ -131,7 +133,7 @@ func (t *SnapshotIsolation) Rollback() Transaction {
 	t.locks.UnlockAll()
 	t.Table.DeleteSnapshot(t.TransactionId)
 	t.Operations = make([]Operation, 0)
-	t.keysWrittenTo = make(map[Key]struct{})
+	t.keysTouched = make(map[Key]struct{})
 
 	return t
 }
@@ -144,15 +146,15 @@ func (t *SnapshotIsolation) Commit() Transaction {
 	t.locks.UnlockAll()
 	t.Table.DeleteSnapshot(t.TransactionId)
 	t.Operations = make([]Operation, 0)
-	t.keysWrittenTo = make(map[Key]struct{})
+	t.keysTouched = make(map[Key]struct{})
 
 	return t
 }
 
-func (t *SnapshotIsolation) GetKeysWrittenTo() []Key {
+func (t *SnapshotIsolation) GetKeysTouched() []Key {
 	res := make([]Key, 0)
 
-	for key := range t.keysWrittenTo {
+	for key := range t.keysTouched {
 		res = append(res, key)
 	}
 

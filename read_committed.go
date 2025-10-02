@@ -5,7 +5,7 @@ type ReadCommitted struct {
 	Table         *Table
 	Operations    []Operation
 	locks         *TransactionLocks
-	keysWrittenTo map[Key]struct{}
+	keysTouched   map[Key]struct{}
 }
 
 func NewReadCommitted(transactionId TransactionId, table *Table) *ReadCommitted {
@@ -14,7 +14,7 @@ func NewReadCommitted(transactionId TransactionId, table *Table) *ReadCommitted 
 		Table:         table,
 		Operations:    make([]Operation, 0),
 		locks:         NewTransactionLocks(),
-		keysWrittenTo: make(map[Key]struct{}),
+		keysTouched:   make(map[Key]struct{}),
 	}
 }
 
@@ -42,7 +42,7 @@ func (t *ReadCommitted) Set(key Key, value Value) Transaction {
 		ToValue:   value,
 	})
 
-	t.keysWrittenTo[key] = struct{}{}
+	t.keysTouched[key] = struct{}{}
 	row.LatestUncommitted = value
 	row.UncommittedByTxId[t.TransactionId] = value
 	t.Table.Data[key] = row
@@ -60,6 +60,8 @@ func (t *ReadCommitted) Get(key Key) Value {
 	if didILock {
 		defer t.locks.Unlock(&row)
 	}
+
+	t.keysTouched[key] = struct{}{}
 
 	if uncommitted, ok := row.UncommittedByTxId[t.TransactionId]; ok {
 		return uncommitted
@@ -86,10 +88,10 @@ func (t *ReadCommitted) Delete(key Key) Transaction {
 		ToValue:   EmptyValue(),
 	})
 
-	if _, ok := t.keysWrittenTo[key]; ok {
-		delete(t.keysWrittenTo, key)
+	if _, ok := t.keysTouched[key]; ok {
+		delete(t.keysTouched, key)
 	} else {
-		t.keysWrittenTo[key] = struct{}{}
+		t.keysTouched[key] = struct{}{}
 	}
 
 	row.LatestUncommitted = EmptyValue()
@@ -122,7 +124,7 @@ func (t *ReadCommitted) Rollback() Transaction {
 
 	t.locks.UnlockAll()
 	t.Operations = make([]Operation, 0)
-	t.keysWrittenTo = make(map[Key]struct{})
+	t.keysTouched = make(map[Key]struct{})
 
 	return t
 }
@@ -134,15 +136,15 @@ func (t *ReadCommitted) Commit() Transaction {
 
 	t.locks.UnlockAll()
 	t.Operations = make([]Operation, 0)
-	t.keysWrittenTo = make(map[Key]struct{})
+	t.keysTouched = make(map[Key]struct{})
 
 	return t
 }
 
-func (t *ReadCommitted) GetKeysWrittenTo() []Key {
+func (t *ReadCommitted) GetKeysTouched() []Key {
 	res := make([]Key, 0)
 
-	for key := range t.keysWrittenTo {
+	for key := range t.keysTouched {
 		res = append(res, key)
 	}
 

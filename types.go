@@ -117,7 +117,7 @@ type Transaction interface {
 	Lock(key Key) Transaction
 	Rollback() Transaction
 	Commit() Transaction
-	GetKeysWrittenTo() []Key
+	GetKeysTouched() []Key
 	GetLocks() *TransactionLocks
 }
 

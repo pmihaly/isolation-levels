@@ -5,7 +5,7 @@ type TwoPhaseLocking struct {
 	Table         *Table
 	Operations    []Operation
 	locks         *TransactionLocks
-	keysWrittenTo map[Key]struct{}
+	keysTouched   map[Key]struct{}
 }
 
 func NewTwoPhaseLocking(transactionId TransactionId, table *Table) *TwoPhaseLocking {
@@ -14,7 +14,7 @@ func NewTwoPhaseLocking(transactionId TransactionId, table *Table) *TwoPhaseLock
 		Table:         table,
 		Operations:    make([]Operation, 0),
 		locks:         NewTransactionLocks(),
-		keysWrittenTo: make(map[Key]struct{}),
+		keysTouched:   make(map[Key]struct{}),
 	}
 }
 
@@ -41,7 +41,7 @@ func (t *TwoPhaseLocking) Set(key Key, value Value) Transaction {
 		ToValue:   value,
 	})
 
-	t.keysWrittenTo[key] = struct{}{}
+	t.keysTouched[key] = struct{}{}
 	row.LatestUncommitted = value
 	row.UncommittedByTxId[t.TransactionId] = value
 	t.Table.Data[key] = row
@@ -58,6 +58,7 @@ func (t *TwoPhaseLocking) Get(key Key) Value {
 	}
 
 	t.locks.Lock(Read, &row)
+	t.keysTouched[key] = struct{}{}
 
 	if uncommitted, ok := row.UncommittedByTxId[t.TransactionId]; ok {
 		return uncommitted
@@ -84,10 +85,10 @@ func (t *TwoPhaseLocking) Delete(key Key) Transaction {
 		ToValue:   EmptyValue(),
 	})
 
-	if _, ok := t.keysWrittenTo[key]; ok {
-		delete(t.keysWrittenTo, key)
+	if _, ok := t.keysTouched[key]; ok {
+		delete(t.keysTouched, key)
 	} else {
-		t.keysWrittenTo[key] = struct{}{}
+		t.keysTouched[key] = struct{}{}
 	}
 
 	row.LatestUncommitted = EmptyValue()
@@ -122,7 +123,7 @@ func (t *TwoPhaseLocking) Rollback() Transaction {
 	t.locks.UnlockAll()
 	t.Table.DeleteSnapshot(t.TransactionId)
 	t.Operations = make([]Operation, 0)
-	t.keysWrittenTo = make(map[Key]struct{})
+	t.keysTouched = make(map[Key]struct{})
 
 	return t
 }
@@ -135,15 +136,15 @@ func (t *TwoPhaseLocking) Commit() Transaction {
 	t.locks.UnlockAll()
 	t.Table.DeleteSnapshot(t.TransactionId)
 	t.Operations = make([]Operation, 0)
-	t.keysWrittenTo = make(map[Key]struct{})
+	t.keysTouched = make(map[Key]struct{})
 
 	return t
 }
 
-func (t *TwoPhaseLocking) GetKeysWrittenTo() []Key {
+func (t *TwoPhaseLocking) GetKeysTouched() []Key {
 	res := make([]Key, 0)
 
-	for key := range t.keysWrittenTo {
+	for key := range t.keysTouched {
 		res = append(res, key)
 	}
 

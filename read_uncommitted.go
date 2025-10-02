@@ -5,7 +5,7 @@ type ReadUncommitted struct {
 	Table         *Table
 	Operations    []Operation
 	locks         *TransactionLocks
-	keysWrittenTo map[Key]struct{}
+	keysTouched   map[Key]struct{}
 }
 
 func NewReadUncommitted(transactionId TransactionId, table *Table) *ReadUncommitted {
@@ -14,7 +14,7 @@ func NewReadUncommitted(transactionId TransactionId, table *Table) *ReadUncommit
 		Table:         table,
 		Operations:    make([]Operation, 0),
 		locks:         NewTransactionLocks(),
-		keysWrittenTo: make(map[Key]struct{}),
+		keysTouched:   make(map[Key]struct{}),
 	}
 }
 
@@ -38,7 +38,7 @@ func (t *ReadUncommitted) Set(key Key, value Value) Transaction {
 		ToValue:   value,
 	})
 
-	t.keysWrittenTo[key] = struct{}{}
+	t.keysTouched[key] = struct{}{}
 	row.LatestUncommitted = value
 	t.Table.Data[key] = row
 
@@ -56,6 +56,8 @@ func (t *ReadUncommitted) Get(key Key) Value {
 	if didILock {
 		defer t.locks.Unlock(&row)
 	}
+
+	t.keysTouched[key] = struct{}{}
 
 	return row.LatestUncommitted
 }
@@ -78,10 +80,10 @@ func (t *ReadUncommitted) Delete(key Key) Transaction {
 		ToValue:   EmptyValue(),
 	})
 
-	if _, ok := t.keysWrittenTo[key]; ok {
-		delete(t.keysWrittenTo, key)
+	if _, ok := t.keysTouched[key]; ok {
+		delete(t.keysTouched, key)
 	} else {
-		t.keysWrittenTo[key] = struct{}{}
+		t.keysTouched[key] = struct{}{}
 	}
 
 	row.LatestUncommitted = EmptyValue()
@@ -112,7 +114,7 @@ func (t *ReadUncommitted) Rollback() Transaction {
 
 	t.locks.UnlockAll()
 	t.Operations = make([]Operation, 0)
-	t.keysWrittenTo = make(map[Key]struct{})
+	t.keysTouched = make(map[Key]struct{})
 
 	return t
 }
@@ -124,15 +126,15 @@ func (t *ReadUncommitted) Commit() Transaction {
 
 	t.locks.UnlockAll()
 	t.Operations = make([]Operation, 0)
-	t.keysWrittenTo = make(map[Key]struct{})
+	t.keysTouched = make(map[Key]struct{})
 
 	return t
 }
 
-func (t *ReadUncommitted) GetKeysWrittenTo() []Key {
+func (t *ReadUncommitted) GetKeysTouched() []Key {
 	res := make([]Key, 0)
 
-	for key := range t.keysWrittenTo {
+	for key := range t.keysTouched {
 		res = append(res, key)
 	}
 

@@ -171,16 +171,16 @@ func PlayEvents(events []Event, table *Table) string {
 					mermaid += addPrefixNewline(readTargetParticipant+" ->> "+string(event.TxId)+": "+string(event.Key)+" = "+string(tx.Get(event.Key)), &mermaidLock)
 
 				case Commit:
-					keysWrittenTo := tx.GetKeysWrittenTo()
+					keysTouched := tx.GetKeysTouched()
 
-					for _, key := range keysWrittenTo {
+					for _, key := range keysTouched {
 						mermaid += addPrefixNewline(string(event.TxId)+" ->> "+string(key)+": commit", &mermaidLock)
 					}
 					lockLevels := tx.GetLocks().GetLockLevels()
 
 					tx.Commit()
 
-					for _, key := range keysWrittenTo {
+					for _, key := range keysTouched {
 						mermaid += addPrefixNewline(string(key)+" ->> "+string(event.TxId)+": ok", &mermaidLock)
 
 						lockLevel := lockLevels[key]
