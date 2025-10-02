@@ -142,8 +142,7 @@ func PlayEvents(events []Event, table *Table) string {
 
 					readTargetParticipant := string(event.Key)
 
-					snapshots, hasSnapshots := table.GetSnapshot(txId)
-					_, hasSnapshots = snapshots[event.Key]
+					_, hasSnapshots := table.GetSnapshot(txId)
 
 					if isUsingSnapshots && hasSnapshots {
 						readTargetParticipant = toSnapshotName(event)
