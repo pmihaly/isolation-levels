@@ -12,7 +12,8 @@
       - [ ] Scheduler/Executor which handles concurrency things
         - encapsulates wg, unblocks and "var transactions sync.Map"
     - [ ] Participants ordering
-    - [ ] Mermaid: display snapshots only when reading from it
+    - [x] Mermaid: display snapshots only when reading from it
+    - [ ] Mermaid snapshot rendering test: should only print dotted arrow if locked by other txn, not by itself
     - [x] proper activation levels: right now there is a bug: if we read/write multiple times, it'll write "activate" even if it is already activated
 - [ ] refactor each levels to build on top of previous levels
 - [ ] figure out how to make TestDirtyReadsWrites.NewTwoPhaseLocking concurrent

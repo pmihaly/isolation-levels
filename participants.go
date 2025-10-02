@@ -29,6 +29,11 @@ func (participants *Participants) AddToMermaid(mermaid *MermaidBuilder) {
 	// if a participant has a rightOf other than no_alignment, display that participant right of the value of that attribute
 
 	for name, participantType := range participants.participantTypesByName {
+		_, isUsed := mermaid.ParticipantsUsed[name]
+		if !isUsed {
+			continue
+		}
+
 		if participantType == transactionParticipant {
 			mermaid.AddParticipant(name, "actor")
 			continue

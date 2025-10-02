@@ -21,18 +21,35 @@ const (
 )
 
 type MermaidBuilder struct {
-	lock         sync.Mutex
-	diagramLines []string
-	// unmaterializedArrowsByFromTo map[string]int
+	lock                         sync.Mutex
+	diagramLines                 []string
+	unmaterializedArrowsByFromTo map[ArrowFromTo]int
+	arrowFromToByIndex           map[int]ArrowFromTo
 	activationLevelByParticipant map[string]int
 	participantLines             []string
+	ParticipantsUsed             map[string]struct{}
+}
+
+type ArrowFromTo struct {
+	from string
+	to   string
+}
+
+func (ft *ArrowFromTo) Opposite() ArrowFromTo {
+	return ArrowFromTo{
+		from: ft.to,
+		to:   ft.from,
+	}
 }
 
 func NewMermaidBuilder() *MermaidBuilder {
 	return &MermaidBuilder{
 		lock:                         sync.Mutex{},
 		diagramLines:                 make([]string, 0),
+		unmaterializedArrowsByFromTo: make(map[ArrowFromTo]int),
+		arrowFromToByIndex:           make(map[int]ArrowFromTo),
 		activationLevelByParticipant: map[string]int{},
+		ParticipantsUsed:             make(map[string]struct{}),
 	}
 }
 
@@ -48,18 +65,30 @@ func (builder *MermaidBuilder) AddArrow(arrowType ArrowType, from, to, descripti
 		mermaidArrowType = "-->>"
 	}
 
+	if arrowMaterialization != asUnmaterialized {
+		builder.ParticipantsUsed[from] = struct{}{}
+		builder.ParticipantsUsed[to] = struct{}{}
+	}
+
+	fromTo := ArrowFromTo{
+		from: from,
+		to:   to,
+	}
+
+	switch arrowMaterialization {
+	case asUnmaterialized:
+		builder.unmaterializedArrowsByFromTo[fromTo] = len(builder.diagramLines)
+	case materializeOpposite:
+		delete(builder.unmaterializedArrowsByFromTo, fromTo)
+	}
 	builder.diagramLines = append(builder.diagramLines, fmt.Sprintf("%v %v %v: %v", from, mermaidArrowType, to, description))
-	//	switch arrowMaterialization {
-	//		case asUnmaterialized:
-	//			builder.unmaterializedArrowsByFromTo[from+to] = len(builder.diagramLines)
-	//		case materializeOpposite:
-	//			delete(builder.unmaterializedArrowsByFromTo, to+from)
-	//	}
+	builder.arrowFromToByIndex[len(builder.diagramLines)-1] = fromTo
 }
 
 func (builder *MermaidBuilder) EnsureActivatedOnLevel(desiredActivationLevel int, participant string) {
 	builder.lock.Lock()
 	defer builder.lock.Unlock()
+	builder.ParticipantsUsed[participant] = struct{}{}
 
 	if desiredActivationLevel < 0 {
 		return
@@ -91,6 +120,7 @@ func (builder *MermaidBuilder) EnsureActivatedOnLevel(desiredActivationLevel int
 func (builder *MermaidBuilder) AddNote(participant, note string) {
 	builder.lock.Lock()
 	defer builder.lock.Unlock()
+	builder.ParticipantsUsed[participant] = struct{}{}
 
 	builder.diagramLines = append(builder.diagramLines, fmt.Sprintf("note over %v: %v", participant, note))
 }
@@ -109,8 +139,12 @@ func (builder *MermaidBuilder) Build() string {
 		diagram += addPrefixNewline(participant)
 	}
 
-	for _, line := range builder.diagramLines {
-		diagram += addPrefixNewline(line)
+	for i, line := range builder.diagramLines {
+		arrowFromTo, isArrow := builder.arrowFromToByIndex[i]
+		_, isUnmaterialized := builder.unmaterializedArrowsByFromTo[arrowFromTo]
+		if !isArrow || !isUnmaterialized {
+			diagram += addPrefixNewline(line)
+		}
 	}
 
 	return diagram

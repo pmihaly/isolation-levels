@@ -140,16 +140,16 @@ func PlayEvents(events []Event, table *Table) string {
 
 					value := tx.Get(event.Key)
 
-					readTargetParticipant := string(event.Key)
+					readTarget := string(event.Key)
 
 					_, hasSnapshots := table.GetSnapshot(txId)
 
 					if isUsingSnapshots && hasSnapshots {
-						readTargetParticipant = toSnapshotName(event)
-						participants.EnsureParticipantAdded(readTargetParticipant, snapshotParticipant, NO_ALIGNMENT)
+						readTarget = toSnapshotName(event)
+						participants.EnsureParticipantAdded(readTarget, snapshotParticipant, NO_ALIGNMENT)
 					}
 
-					mermaid.AddArrow(solid, string(event.TxId), readTargetParticipant, "get "+string(event.Key), materializeOpposite)
+					mermaid.AddArrow(solid, string(event.TxId), readTarget, "get "+string(event.Key), materializeOpposite)
 
 					lockLevels := tx.GetLocks().GetLockLevels()
 					lockLevel := lockLevels[event.Key]
@@ -158,7 +158,7 @@ func PlayEvents(events []Event, table *Table) string {
 						mermaid.EnsureActivatedOnLevel(1, string(event.Key))
 					}
 
-					mermaid.AddArrow(solid, string(event.Key), string(event.TxId), fmt.Sprintf("%v = %v", event.Key, value), asMaterialized)
+					mermaid.AddArrow(solid, readTarget, string(event.TxId), fmt.Sprintf("%v = %v", event.Key, value), asMaterialized)
 
 				case Commit:
 					keysTouched := tx.GetKeysTouched()
