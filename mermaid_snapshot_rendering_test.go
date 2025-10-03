@@ -59,7 +59,6 @@ func TestShowSnapshotUsedForReading(t *testing.T) {
     activate x
     x ->> t1: ok
     note over x: {"Key":"x","Committed":"1","LatestUncommitted":"2","UncommittedByTxId":{"t1":"2"}}
-    t1 -->> x: : get x
     t1 ->> x snapshot of t1: get x
     deactivate x
     x snapshot of t1 ->> t1: x = 2

@@ -24,7 +24,7 @@ const (
 	ReadWrite
 )
 
-func (t *TransactionLocks) Lock(lockType LockLevel, row *Row) bool {
+func (t *TransactionLocks) Lock(lockType LockLevel, txId TransactionId, row *Row) bool {
 	_, isReadLocked := t.readLockedKeys[row.Key]
 	_, isWriteLocked := t.writeLockedKeys[row.Key]
 
@@ -49,7 +49,7 @@ func (t *TransactionLocks) Lock(lockType LockLevel, row *Row) bool {
 		delete(t.readLockedKeys, row.Key)
 	}
 
-	row.Lock.Lock()
+	row.Lock.LockFor(txId)
 	t.writeLockedKeys[row.Key] = row.Lock
 
 	return true

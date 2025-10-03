@@ -33,7 +33,7 @@ func (t *SnapshotIsolation) Set(key Key, value Value) Transaction {
 		prevValue = EmptyValue()
 	}
 
-	didILock := t.locks.Lock(ReadWrite, &row)
+	didILock := t.locks.Lock(ReadWrite, t.TransactionId, &row)
 	if didILock {
 		defer t.locks.Unlock(&row)
 	}
@@ -60,7 +60,7 @@ func (t *SnapshotIsolation) Get(key Key) Value {
 		return EmptyValue()
 	}
 
-	didILock := t.locks.Lock(Read, &row)
+	didILock := t.locks.Lock(Read, t.TransactionId, &row)
 	if didILock {
 		defer t.locks.Unlock(&row)
 	}
@@ -84,7 +84,7 @@ func (t *SnapshotIsolation) Delete(key Key) Transaction {
 		return t
 	}
 
-	didILock := t.locks.Lock(ReadWrite, &row)
+	didILock := t.locks.Lock(ReadWrite, t.TransactionId, &row)
 	if didILock {
 		defer t.locks.Unlock(&row)
 	}
@@ -117,7 +117,7 @@ func (t *SnapshotIsolation) Lock(key Key) Transaction {
 		return t
 	}
 
-	t.locks.Lock(ReadWrite, &row)
+	t.locks.Lock(ReadWrite, t.TransactionId, &row)
 	return t
 }
 

@@ -96,7 +96,7 @@ func PlayEvents(events []Event, table *Table) string {
 
 					row, found := table.Data[event.Key]
 
-					if found && row.Lock.IsLocked() {
+					if found && row.Lock.IsBlocked(event.TxId) {
 						mermaid.AddArrow(dotted, string(event.TxId), string(event.Key), fmt.Sprintf("set %v = %v", event.Key, event.To), asMaterialized)
 					}
 
@@ -134,7 +134,7 @@ func PlayEvents(events []Event, table *Table) string {
 				case ReadOperation:
 					row, found := table.Data[event.Key]
 
-					if found && row.Lock.IsLocked() {
+					if found && row.Lock.IsBlocked(event.TxId) {
 						mermaid.AddArrow(dotted, string(event.TxId), string(event.Key), ": get "+string(event.Key), asMaterialized)
 					}
 

@@ -33,7 +33,7 @@ func (t *TwoPhaseLocking) Set(key Key, value Value) Transaction {
 		prevValue = EmptyValue()
 	}
 
-	t.locks.Lock(ReadWrite, &row)
+	t.locks.Lock(ReadWrite, t.TransactionId, &row)
 
 	t.Operations = append(t.Operations, Operation{
 		Key:       key,
@@ -57,7 +57,7 @@ func (t *TwoPhaseLocking) Get(key Key) Value {
 		return EmptyValue()
 	}
 
-	t.locks.Lock(Read, &row)
+	t.locks.Lock(Read, t.TransactionId, &row)
 	t.keysTouched[key] = struct{}{}
 
 	if uncommitted, ok := row.UncommittedByTxId[t.TransactionId]; ok {
@@ -77,7 +77,7 @@ func (t *TwoPhaseLocking) Delete(key Key) Transaction {
 		return t
 	}
 
-	t.locks.Lock(ReadWrite, &row)
+	t.locks.Lock(ReadWrite, t.TransactionId, &row)
 
 	t.Operations = append(t.Operations, Operation{
 		Key:       key,
@@ -107,7 +107,7 @@ func (t *TwoPhaseLocking) Lock(key Key) Transaction {
 		return t
 	}
 
-	t.locks.Lock(ReadWrite, &row)
+	t.locks.Lock(ReadWrite, t.TransactionId, &row)
 	return t
 }
 

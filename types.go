@@ -38,7 +38,7 @@ func NewRow(key Key, value Value) Row {
 		Committed:         value,
 		LatestUncommitted: value,
 		UncommittedByTxId: make(map[TransactionId]Value),
-		Lock:              &TrackableRWMutex{},
+		Lock:              NewTrackableRWMutex(),
 	}
 }
 
