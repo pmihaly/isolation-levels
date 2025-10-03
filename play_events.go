@@ -103,8 +103,9 @@ func PlayEvents(events []Event, table *Table) string {
 					tx.Set(event.Key, event.To)
 
 					if isUsingSnapshots {
-						participants.EnsureParticipantAdded(toSnapshotName(event), snapshotParticipant, NO_ALIGNMENT)
-						mermaid.AddArrow(solid, string(event.TxId), toSnapshotName(event), fmt.Sprintf("set %v = %v", event.Key, event.To), asUnmaterialized)
+						// participants.EnsureParticipantAdded(toSnapshotName(event.TxId, event.Key), snapshotParticipant, NO_ALIGNMENT)
+						mermaid.EnsureParticipantCreated(toSnapshotName(event.TxId, event.Key), "participant")
+						mermaid.AddArrow(solid, string(event.TxId), toSnapshotName(event.TxId, event.Key), fmt.Sprintf("set %v = %v", event.Key, event.To), asUnmaterialized)
 					}
 
 					mermaid.AddArrow(solid, string(event.TxId), string(event.Key), fmt.Sprintf("set %v = %v", event.Key, event.To), asMaterialized)
@@ -145,8 +146,9 @@ func PlayEvents(events []Event, table *Table) string {
 					_, hasSnapshots := table.GetSnapshot(txId)
 
 					if isUsingSnapshots && hasSnapshots {
-						readTarget = toSnapshotName(event)
-						participants.EnsureParticipantAdded(readTarget, snapshotParticipant, NO_ALIGNMENT)
+						readTarget = toSnapshotName(event.TxId, event.Key)
+						// participants.EnsureParticipantAdded(readTarget, snapshotParticipant, NO_ALIGNMENT)
+						mermaid.EnsureParticipantCreated(toSnapshotName(event.TxId, event.Key), "participant")
 					}
 
 					mermaid.AddArrow(solid, string(event.TxId), readTarget, "get "+string(event.Key), materializeOpposite)
@@ -154,7 +156,7 @@ func PlayEvents(events []Event, table *Table) string {
 					lockLevels := tx.GetLocks().GetLockLevels()
 					lockLevel := lockLevels[event.Key]
 
-					if lockLevel >= Read {
+					if lockLevel < Read {
 						mermaid.EnsureActivatedOnLevel(1, string(event.Key))
 					}
 
@@ -170,6 +172,8 @@ func PlayEvents(events []Event, table *Table) string {
 					for _, key := range keysTouched {
 						mermaid.AddArrow(solid, string(key), string(event.TxId), "ok", asMaterialized)
 						mermaid.EnsureActivatedOnLevel(0, string(key))
+
+						mermaid.EnsureParticipantDestroyed(toSnapshotName(event.TxId, key))
 
 						row, ok := table.Data[key]
 						rowJson, err := json.Marshal(row)
@@ -206,6 +210,6 @@ func PlayEvents(events []Event, table *Table) string {
 	}
 }
 
-func toSnapshotName(event Event) string {
-	return string(event.Key) + " snapshot of " + string(event.TxId)
+func toSnapshotName(txId TransactionId, key Key) string {
+	return string(txId) + " snapshot of " + string(key)
 }

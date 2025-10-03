@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"sync"
 )
 
@@ -28,6 +29,7 @@ type MermaidBuilder struct {
 	activationLevelByParticipant map[string]int
 	participantLines             []string
 	ParticipantsUsed             map[string]struct{}
+	createdParticipants          map[string]struct{}
 }
 
 type ArrowFromTo struct {
@@ -50,6 +52,7 @@ func NewMermaidBuilder() *MermaidBuilder {
 		arrowFromToByIndex:           make(map[int]ArrowFromTo),
 		activationLevelByParticipant: map[string]int{},
 		ParticipantsUsed:             make(map[string]struct{}),
+		createdParticipants:          make(map[string]struct{}),
 	}
 }
 
@@ -130,6 +133,29 @@ func (builder *MermaidBuilder) AddParticipant(name string, participantType strin
 	defer builder.lock.Unlock()
 
 	builder.participantLines = append(builder.participantLines, fmt.Sprintf("%v %v", participantType, name))
+}
+
+func (builder *MermaidBuilder) EnsureParticipantCreated(name string, participantType string) {
+	if _, isAlreadyAdded := builder.createdParticipants[name]; isAlreadyAdded {
+		return
+	}
+
+	builder.lock.Lock()
+	defer builder.lock.Unlock()
+	builder.createdParticipants[name] = struct{}{}
+	builder.diagramLines = append(builder.diagramLines, fmt.Sprintf("create %v %v", participantType, name))
+}
+
+func (builder *MermaidBuilder) EnsureParticipantDestroyed(name string) {
+	if _, exists := builder.createdParticipants[name]; !exists {
+		log.Print(name)
+		return
+	}
+
+	builder.lock.Lock()
+	defer builder.lock.Unlock()
+
+	builder.diagramLines = append(builder.diagramLines, fmt.Sprintf("destroy %v", name))
 }
 
 func (builder *MermaidBuilder) Build() string {
