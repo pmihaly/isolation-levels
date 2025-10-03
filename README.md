@@ -14,6 +14,9 @@
     - [ ] Participants ordering
     - [x] Mermaid: display snapshots only when reading from it
     - [x] Mermaid snapshot rendering test: should only print dotted arrow if locked by other txn, not by itself
+    - [ ] snapshot creation:
+      - on read/write/delete: if snapshot does not exist: read row and set snapshot value
+      - https://mermaid.js.org/syntax/sequenceDiagram.html#actor-creation-and-destruction-v10-3-0
     - [x] proper activation levels: right now there is a bug: if we read/write multiple times, it'll write "activate" even if it is already activated
 - [ ] refactor each levels to build on top of previous levels
 - [ ] figure out how to make TestDirtyReadsWrites.NewTwoPhaseLocking concurrent
