@@ -2,8 +2,15 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"sync"
+)
+
+type ParticipantType int
+
+const (
+	transactionParticipant ParticipantType = iota
+	snapshotParticipant
+	rowParticipant
 )
 
 type ArrowType int
@@ -27,9 +34,9 @@ type MermaidBuilder struct {
 	unmaterializedArrowsByFromTo map[ArrowFromTo]int
 	arrowFromToByIndex           map[int]ArrowFromTo
 	activationLevelByParticipant map[string]int
-	participantLines             []string
-	ParticipantsUsed             map[string]struct{}
-	createdParticipants          map[string]struct{}
+	participantOrder             []string
+	participantsUsed             map[string]struct{}
+	participantTypesByName       map[string]ParticipantType
 }
 
 type ArrowFromTo struct {
@@ -51,8 +58,8 @@ func NewMermaidBuilder() *MermaidBuilder {
 		unmaterializedArrowsByFromTo: make(map[ArrowFromTo]int),
 		arrowFromToByIndex:           make(map[int]ArrowFromTo),
 		activationLevelByParticipant: map[string]int{},
-		ParticipantsUsed:             make(map[string]struct{}),
-		createdParticipants:          make(map[string]struct{}),
+		participantsUsed:             make(map[string]struct{}),
+		participantTypesByName:       make(map[string]ParticipantType),
 	}
 }
 
@@ -69,8 +76,8 @@ func (builder *MermaidBuilder) AddArrow(arrowType ArrowType, from, to, descripti
 	}
 
 	if arrowMaterialization != asUnmaterialized {
-		builder.ParticipantsUsed[from] = struct{}{}
-		builder.ParticipantsUsed[to] = struct{}{}
+		builder.participantsUsed[from] = struct{}{}
+		builder.participantsUsed[to] = struct{}{}
 	}
 
 	fromTo := ArrowFromTo{
@@ -91,7 +98,7 @@ func (builder *MermaidBuilder) AddArrow(arrowType ArrowType, from, to, descripti
 func (builder *MermaidBuilder) EnsureActivatedOnLevel(desiredActivationLevel int, participant string) {
 	builder.lock.Lock()
 	defer builder.lock.Unlock()
-	builder.ParticipantsUsed[participant] = struct{}{}
+	builder.participantsUsed[participant] = struct{}{}
 
 	if desiredActivationLevel < 0 {
 		return
@@ -123,46 +130,37 @@ func (builder *MermaidBuilder) EnsureActivatedOnLevel(desiredActivationLevel int
 func (builder *MermaidBuilder) AddNote(participant, note string) {
 	builder.lock.Lock()
 	defer builder.lock.Unlock()
-	builder.ParticipantsUsed[participant] = struct{}{}
+	builder.participantsUsed[participant] = struct{}{}
 
 	builder.diagramLines = append(builder.diagramLines, fmt.Sprintf("note over %v: %v", participant, note))
 }
 
-func (builder *MermaidBuilder) AddParticipant(name string, participantType string) {
+func (builder *MermaidBuilder) EnsureParticipantAdded(name string, participantType ParticipantType) {
 	builder.lock.Lock()
 	defer builder.lock.Unlock()
-
-	builder.participantLines = append(builder.participantLines, fmt.Sprintf("%v %v", participantType, name))
-}
-
-func (builder *MermaidBuilder) EnsureParticipantCreated(name string, participantType string) {
-	if _, isAlreadyAdded := builder.createdParticipants[name]; isAlreadyAdded {
+	if _, alreadyAdded := builder.participantTypesByName[name]; alreadyAdded {
 		return
 	}
-
-	builder.lock.Lock()
-	defer builder.lock.Unlock()
-	builder.createdParticipants[name] = struct{}{}
-	builder.diagramLines = append(builder.diagramLines, fmt.Sprintf("create %v %v", participantType, name))
-}
-
-func (builder *MermaidBuilder) EnsureParticipantDestroyed(name string) {
-	if _, exists := builder.createdParticipants[name]; !exists {
-		log.Print(name)
-		return
-	}
-
-	builder.lock.Lock()
-	defer builder.lock.Unlock()
-
-	builder.diagramLines = append(builder.diagramLines, fmt.Sprintf("destroy %v", name))
+	builder.participantTypesByName[name] = participantType
+	builder.participantOrder = append(builder.participantOrder, name)
 }
 
 func (builder *MermaidBuilder) Build() string {
 	diagram := "sequenceDiagram\n"
 
-	for _, participant := range builder.participantLines {
-		diagram += addPrefixNewline(participant)
+	for _, participant := range builder.participantOrder {
+		_, isUsed := builder.participantsUsed[participant]
+		if !isUsed {
+			continue
+		}
+
+		participantType, _ := builder.participantTypesByName[participant]
+		if participantType == transactionParticipant {
+			diagram += addPrefixNewline(fmt.Sprintf("actor %v", participant))
+			continue
+		}
+
+		diagram += addPrefixNewline(fmt.Sprintf("participant %v", participant))
 	}
 
 	for i, line := range builder.diagramLines {
