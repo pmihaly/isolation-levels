@@ -33,11 +33,11 @@ func PlayEvents(events []Event, table *Table) string {
 			continue
 		}
 
-		mermaid.EnsureParticipantAdded(string(row), rowParticipant)
+		mermaid.EnsureParticipantAdded(string(row), rowParticipant, Materialized, Static)
 	}
 
 	for _, transactionId := range transactionOrder {
-		mermaid.EnsureParticipantAdded(string(transactionId), transactionParticipant)
+		mermaid.EnsureParticipantAdded(string(transactionId), transactionParticipant, Materialized, Static)
 	}
 
 	for key := range rows {
@@ -103,12 +103,12 @@ func PlayEvents(events []Event, table *Table) string {
 
 					if isUsingSnapshots {
 						snapshotName := toSnapshotName(event.TxId, event.Key)
-						mermaid.EnsureParticipantAddedUnmaterialized(snapshotName, snapshotParticipant)
+						mermaid.EnsureParticipantAdded(snapshotName, snapshotParticipant, Unmaterialized, Dynamic)
 						mermaid.AddArrow(solid, string(event.TxId), snapshotName, fmt.Sprintf("set %v = %v", event.Key, event.To), asUnmaterialized)
 					}
 
 					mermaid.AddArrow(solid, string(event.TxId), string(event.Key), fmt.Sprintf("set %v = %v", event.Key, event.To), asMaterialized)
-					mermaid.EnsureParticipantAdded(string(event.Key), rowParticipant)
+					mermaid.EnsureParticipantAdded(string(event.Key), rowParticipant, Materialized, Static)
 
 					lockLevels := tx.GetLocks().GetLockLevels()
 					lockLevel := lockLevels[event.Key]
@@ -146,9 +146,7 @@ func PlayEvents(events []Event, table *Table) string {
 
 					if isUsingSnapshots && hasSnapshots {
 						readTarget = toSnapshotName(event.TxId, event.Key)
-						mermaid.EnsureParticipantAdded(readTarget, snapshotParticipant)
-						mermaid.MaterializeParticipant(readTarget)
-						mermaid.CreateParticipant(readTarget)
+						mermaid.EnsureParticipantAdded(readTarget, snapshotParticipant, Materialized, Dynamic)
 					}
 
 					mermaid.AddArrow(solid, string(event.TxId), readTarget, "get "+string(event.Key), materializeOpposite)
@@ -183,7 +181,7 @@ func PlayEvents(events []Event, table *Table) string {
 					if isUsingSnapshots {
 						for _, key := range keysTouched {
 							snapshotName := toSnapshotName(event.TxId, key)
-							mermaid.DestroyParticipant(snapshotName)
+							mermaid.EnsureParticipantDestroyed(snapshotName)
 						}
 					}
 				}

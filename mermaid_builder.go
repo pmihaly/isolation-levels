@@ -28,6 +28,20 @@ const (
 	materializeOpposite
 )
 
+type ParticipantMaterialization int
+
+const (
+	Materialized ParticipantMaterialization = iota
+	Unmaterialized
+)
+
+type ParticipantDynamism int
+
+const (
+	Static ParticipantDynamism = iota
+	Dynamic
+)
+
 type MermaidBuilder struct {
 	lock                         sync.Mutex
 	diagramLines                 []string
@@ -93,7 +107,7 @@ func (builder *MermaidBuilder) AddArrow(arrowType ArrowType, from, to, descripti
 	case asUnmaterialized:
 		builder.unmaterializedArrowsByFromTo[fromTo] = len(builder.diagramLines)
 	case materializeOpposite:
-		delete(builder.unmaterializedArrowsByFromTo, fromTo)
+		delete(builder.unmaterializedArrowsByFromTo, fromTo.Opposite())
 	}
 	builder.diagramLines = append(builder.diagramLines, fmt.Sprintf("%v %v %v: %v", from, mermaidArrowType, to, description))
 	builder.arrowFromToByIndex[len(builder.diagramLines)-1] = fromTo
@@ -139,55 +153,39 @@ func (builder *MermaidBuilder) AddNote(participant, note string) {
 	builder.diagramLines = append(builder.diagramLines, fmt.Sprintf("note over %v: %v", participant, note))
 }
 
-func (builder *MermaidBuilder) EnsureParticipantAdded(name string, participantType ParticipantType) {
+func (builder *MermaidBuilder) EnsureParticipantAdded(name string, participantType ParticipantType, materialization ParticipantMaterialization, dynamism ParticipantDynamism) {
 	builder.lock.Lock()
 	defer builder.lock.Unlock()
-	if _, alreadyAdded := builder.participantTypesByName[name]; alreadyAdded {
-		return
-	}
-	builder.participantTypesByName[name] = participantType
-	builder.participantOrder = append(builder.participantOrder, name)
-}
 
-func (builder *MermaidBuilder) EnsureParticipantAddedUnmaterialized(name string, participantType ParticipantType) {
-	builder.lock.Lock()
-	defer builder.lock.Unlock()
-	if _, alreadyAdded := builder.participantTypesByName[name]; alreadyAdded {
-		return
+	if _, alreadyAdded := builder.participantTypesByName[name]; !alreadyAdded {
+		builder.participantTypesByName[name] = participantType
+		builder.participantOrder = append(builder.participantOrder, name)
 	}
-	builder.participantTypesByName[name] = participantType
-	builder.participantOrder = append(builder.participantOrder, name)
-	builder.unmaterializedParticipants[name] = struct{}{}
-}
 
-func (builder *MermaidBuilder) MaterializeParticipant(name string) {
-	builder.lock.Lock()
-	defer builder.lock.Unlock()
 	delete(builder.unmaterializedParticipants, name)
-}
+	if materialization == Unmaterialized {
+		builder.unmaterializedParticipants[name] = struct{}{}
+	}
 
-func (builder *MermaidBuilder) CreateParticipant(name string) {
-	builder.lock.Lock()
-	defer builder.lock.Unlock()
-
-	if _, alreadyCreated := builder.dynamicallyCreated[name]; alreadyCreated {
+	if dynamism == Static {
 		return
 	}
 
-	builder.participantsUsed[name] = struct{}{}
-	builder.dynamicallyCreated[name] = struct{}{}
-	delete(builder.unmaterializedParticipants, name)
+	if _, alreadyDynamicallyCreated := builder.dynamicallyCreated[name]; !alreadyDynamicallyCreated {
+		builder.dynamicallyCreated[name] = struct{}{}
+	}
 }
 
-func (builder *MermaidBuilder) DestroyParticipant(name string) {
+func (builder *MermaidBuilder) EnsureParticipantDestroyed(name string) {
 	builder.lock.Lock()
 	defer builder.lock.Unlock()
 
-	if _, wasCreated := builder.dynamicallyCreated[name]; !wasCreated {
-		return
-	}
+	_, isDynamic := builder.dynamicallyCreated[name]
+	_, isUsed := builder.participantsUsed[name]
 
-	builder.diagramLines = append(builder.diagramLines, fmt.Sprintf("destroy %v", name))
+	if isDynamic && isUsed {
+		builder.diagramLines = append(builder.diagramLines, fmt.Sprintf("destroy %v", name))
+	}
 }
 
 func (builder *MermaidBuilder) Build() string {
@@ -228,9 +226,15 @@ func (builder *MermaidBuilder) Build() string {
 			continue
 		}
 
-		if _, isUnmaterialized := builder.unmaterializedArrowsByFromTo[arrowFromTo]; isUnmaterialized {
+		_, isExplicitlyUnmaterialized := builder.unmaterializedArrowsByFromTo[arrowFromTo]
+		_, fromUnmaterialized := builder.unmaterializedParticipants[arrowFromTo.from]
+		_, toUnmaterialized := builder.unmaterializedParticipants[arrowFromTo.to]
+		anyParticipantUnmaterialized := fromUnmaterialized || toUnmaterialized
+
+		if isExplicitlyUnmaterialized && anyParticipantUnmaterialized {
 			continue
 		}
+
 		for _, participantName := range []string{arrowFromTo.from, arrowFromTo.to} {
 			if _, isDynamic := builder.dynamicallyCreated[participantName]; !isDynamic {
 				continue
