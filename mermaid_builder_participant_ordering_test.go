@@ -15,12 +15,12 @@ func TestParticipantOrdering(t *testing.T) {
 		{
 			name: "four transactions with equal split",
 			setupParticipants: func(mb *MermaidBuilder) {
-				mb.EnsureParticipantAdded("row1", rowParticipant, Materialized, Static)
-				mb.EnsureParticipantAdded("row2", rowParticipant, Materialized, Static)
-				mb.EnsureParticipantAdded("t1", transactionParticipant, Materialized, Static)
-				mb.EnsureParticipantAdded("t2", transactionParticipant, Materialized, Static)
-				mb.EnsureParticipantAdded("t3", transactionParticipant, Materialized, Static)
-				mb.EnsureParticipantAdded("t4", transactionParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("row1", RowParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("row2", RowParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("t1", TransactionParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("t2", TransactionParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("t3", TransactionParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("t4", TransactionParticipant, Materialized, Static)
 
 				mb.participantsUsed["row1"] = struct{}{}
 				mb.participantsUsed["row2"] = struct{}{}
@@ -35,8 +35,8 @@ func TestParticipantOrdering(t *testing.T) {
 		{
 			name: "single transaction with rows",
 			setupParticipants: func(mb *MermaidBuilder) {
-				mb.EnsureParticipantAdded("row1", rowParticipant, Materialized, Static)
-				mb.EnsureParticipantAdded("t1", transactionParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("row1", RowParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("t1", TransactionParticipant, Materialized, Static)
 
 				mb.participantsUsed["row1"] = struct{}{}
 				mb.participantsUsed["t1"] = struct{}{}
@@ -47,10 +47,10 @@ func TestParticipantOrdering(t *testing.T) {
 		{
 			name: "three transactions with rows",
 			setupParticipants: func(mb *MermaidBuilder) {
-				mb.EnsureParticipantAdded("row1", rowParticipant, Materialized, Static)
-				mb.EnsureParticipantAdded("t1", transactionParticipant, Materialized, Static)
-				mb.EnsureParticipantAdded("t2", transactionParticipant, Materialized, Static)
-				mb.EnsureParticipantAdded("t3", transactionParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("row1", RowParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("t1", TransactionParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("t2", TransactionParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("t3", TransactionParticipant, Materialized, Static)
 
 				mb.participantsUsed["row1"] = struct{}{}
 				mb.participantsUsed["t1"] = struct{}{}
@@ -63,9 +63,9 @@ func TestParticipantOrdering(t *testing.T) {
 		{
 			name: "only rows, no transactions",
 			setupParticipants: func(mb *MermaidBuilder) {
-				mb.EnsureParticipantAdded("row1", rowParticipant, Materialized, Static)
-				mb.EnsureParticipantAdded("row2", rowParticipant, Materialized, Static)
-				mb.EnsureParticipantAdded("row3", rowParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("row1", RowParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("row2", RowParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("row3", RowParticipant, Materialized, Static)
 
 				mb.participantsUsed["row1"] = struct{}{}
 				mb.participantsUsed["row2"] = struct{}{}
@@ -77,8 +77,8 @@ func TestParticipantOrdering(t *testing.T) {
 		{
 			name: "only transactions, no rows",
 			setupParticipants: func(mb *MermaidBuilder) {
-				mb.EnsureParticipantAdded("t1", transactionParticipant, Materialized, Static)
-				mb.EnsureParticipantAdded("t2", transactionParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("t1", TransactionParticipant, Materialized, Static)
+				mb.EnsureParticipantAdded("t2", TransactionParticipant, Materialized, Static)
 
 				mb.participantsUsed["t1"] = struct{}{}
 				mb.participantsUsed["t2"] = struct{}{}

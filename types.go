@@ -1,5 +1,9 @@
 package main
 
+import (
+	"fmt"
+)
+
 type Key string
 
 func EmptyKey() Key {
@@ -121,13 +125,29 @@ type Transaction interface {
 	GetLocks() *TransactionLocks
 }
 
+func TransactionFromTransactionLevel(level TransactionLevel, txId TransactionId, table *Table) (Transaction, error) {
+
+	switch level {
+	case ReadUncommittedLevel:
+		return NewReadUncommitted(txId, table), nil
+	case ReadCommittedLevel:
+		return NewReadCommitted(txId, table), nil
+	case SnapshotIsolationLevel:
+		return NewSnapshotIsolation(txId, table), nil
+	case TwoPhaseLockingLevel:
+		return NewTwoPhaseLocking(txId, table), nil
+	default:
+		return nil, fmt.Errorf("unknown transactionLevel %v", level)
+	}
+}
+
 type TransactionLevel int
 
 const (
-	readUncommitted TransactionLevel = iota
-	readCommitted
-	snapshotIsolation
-	twoPhaseLocking
+	ReadUncommittedLevel TransactionLevel = iota
+	ReadCommittedLevel
+	SnapshotIsolationLevel
+	TwoPhaseLockingLevel
 )
 
 type EventType int

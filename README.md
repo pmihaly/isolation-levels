@@ -4,7 +4,7 @@
     - [ ] rollback
     - [ ] delete
     - [x] read from snapshot
-    - [ ] error handling
+    - [x] error handling
     - [ ] refactor AFTER ERROR HANDLING
       - [x] extract diagram building
       - [x] extract participant management

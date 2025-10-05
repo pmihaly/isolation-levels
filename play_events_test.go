@@ -9,13 +9,16 @@ func TestPlayEventsProducingMermaid(t *testing.T) {
 	(&table).Data["x"] = NewRow("x", "1")
 
 	events := []Event{
-		NewWrite("t1", twoPhaseLocking, "x", "2"),
-		NewRead("t2", twoPhaseLocking, "x"),
-		NewCommit("t1", twoPhaseLocking),
-		NewCommit("t2", twoPhaseLocking),
+		NewWrite("t1", TwoPhaseLockingLevel, "x", "2"),
+		NewRead("t2", TwoPhaseLockingLevel, "x"),
+		NewCommit("t1", TwoPhaseLockingLevel),
+		NewCommit("t2", TwoPhaseLockingLevel),
 	}
 
-	productedMermaid := PlayEvents(events, &table)
+	productedMermaid, err := PlayEvents(events, &table)
+	if err != nil {
+		t.Errorf("expted PlayEvents to succeed, got error: %v", err)
+	}
 
 	expectedMermaid := `
 sequenceDiagram

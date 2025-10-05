@@ -3,12 +3,18 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 )
 
-func PlayEvents(events []Event, table *Table) string {
+const TIMEOUT_SECS = 3
+const STAGGER_DELAY_MILLIS = 10
+
+func PlayEvents(events []Event, table *Table) (string, error) {
+	if len(events) == 0 {
+		return "", nil
+	}
+
 	transactionEvents := make(map[TransactionId][]Event)
 	transactionOrder := make([]TransactionId, 0)
 	rows := make(map[Key]struct{})
@@ -33,11 +39,11 @@ func PlayEvents(events []Event, table *Table) string {
 			continue
 		}
 
-		mermaid.EnsureParticipantAdded(string(row), rowParticipant, Materialized, Static)
+		mermaid.EnsureParticipantAdded(string(row), RowParticipant, Materialized, Static)
 	}
 
 	for _, transactionId := range transactionOrder {
-		mermaid.EnsureParticipantAdded(string(transactionId), transactionParticipant, Materialized, Static)
+		mermaid.EnsureParticipantAdded(string(transactionId), TransactionParticipant, Materialized, Static)
 	}
 
 	for key := range rows {
@@ -61,7 +67,7 @@ func PlayEvents(events []Event, table *Table) string {
 
 	for txId, events := range transactionEvents {
 		wg.Add(1)
-		go func() {
+		go func() error {
 			defer wg.Done()
 
 			<-unblocks[txId]
@@ -70,22 +76,14 @@ func PlayEvents(events []Event, table *Table) string {
 				tx, _ := txVal.(Transaction)
 
 				if !ok {
-					switch event.TxLevel {
-					case readUncommitted:
-						tx = NewReadUncommitted(event.TxId, table)
-					case readCommitted:
-						tx = NewReadCommitted(event.TxId, table)
-					case snapshotIsolation:
-						tx = NewSnapshotIsolation(event.TxId, table)
-					case twoPhaseLocking:
-						tx = NewTwoPhaseLocking(event.TxId, table)
-					default:
-						continue
+					tx, err := TransactionFromTransactionLevel(event.TxLevel, event.TxId, table)
+					if err != nil {
+						return nil
 					}
 
 					transactions.Store(event.TxId, tx)
 				}
-				isUsingSnapshots := event.TxLevel >= snapshotIsolation
+				isUsingSnapshots := event.TxLevel >= SnapshotIsolationLevel
 
 				switch event.OperationType {
 				case WriteOperation:
@@ -96,19 +94,19 @@ func PlayEvents(events []Event, table *Table) string {
 					row, found := table.Data[event.Key]
 
 					if found && row.Lock.IsBlocked(event.TxId) {
-						mermaid.AddArrow(dotted, string(event.TxId), string(event.Key), fmt.Sprintf("set %v = %v", event.Key, event.To), asMaterialized)
+						mermaid.AddArrow(Dotted, string(event.TxId), string(event.Key), fmt.Sprintf("set %v = %v", event.Key, event.To), AsMaterialized)
 					}
 
 					tx.Set(event.Key, event.To)
 
 					if isUsingSnapshots {
 						snapshotName := toSnapshotName(event.TxId, event.Key)
-						mermaid.EnsureParticipantAdded(snapshotName, snapshotParticipant, Unmaterialized, Dynamic)
-						mermaid.AddArrow(solid, string(event.TxId), snapshotName, fmt.Sprintf("set %v = %v", event.Key, event.To), asUnmaterialized)
+						mermaid.EnsureParticipantAdded(snapshotName, SnapshotParticipant, Unmaterialized, Dynamic)
+						mermaid.AddArrow(Solid, string(event.TxId), snapshotName, fmt.Sprintf("set %v = %v", event.Key, event.To), AsUnmaterialized)
 					}
 
-					mermaid.AddArrow(solid, string(event.TxId), string(event.Key), fmt.Sprintf("set %v = %v", event.Key, event.To), asMaterialized)
-					mermaid.EnsureParticipantAdded(string(event.Key), rowParticipant, Materialized, Static)
+					mermaid.AddArrow(Solid, string(event.TxId), string(event.Key), fmt.Sprintf("set %v = %v", event.Key, event.To), AsMaterialized)
+					mermaid.EnsureParticipantAdded(string(event.Key), RowParticipant, Materialized, Static)
 
 					lockLevels := tx.GetLocks().GetLockLevels()
 					lockLevel := lockLevels[event.Key]
@@ -123,7 +121,7 @@ func PlayEvents(events []Event, table *Table) string {
 					}
 
 					mermaid.EnsureActivatedOnLevel(activationLevel, string(event.Key))
-					mermaid.AddArrow(solid, string(event.Key), string(event.TxId), "ok", asMaterialized)
+					mermaid.AddArrow(Solid, string(event.Key), string(event.TxId), "ok", AsMaterialized)
 
 					row, ok := table.Data[event.Key]
 					rowJson, err := json.Marshal(row)
@@ -132,10 +130,14 @@ func PlayEvents(events []Event, table *Table) string {
 					}
 
 				case ReadOperation:
+					if event.Key == EmptyKey() {
+						continue
+					}
+
 					row, found := table.Data[event.Key]
 
 					if found && row.Lock.IsBlocked(event.TxId) {
-						mermaid.AddArrow(dotted, string(event.TxId), string(event.Key), ": get "+string(event.Key), asMaterialized)
+						mermaid.AddArrow(Dotted, string(event.TxId), string(event.Key), ": get "+string(event.Key), AsMaterialized)
 					}
 
 					value := tx.Get(event.Key)
@@ -146,10 +148,10 @@ func PlayEvents(events []Event, table *Table) string {
 
 					if isUsingSnapshots && hasSnapshots {
 						readTarget = toSnapshotName(event.TxId, event.Key)
-						mermaid.EnsureParticipantAdded(readTarget, snapshotParticipant, Materialized, Dynamic)
+						mermaid.EnsureParticipantAdded(readTarget, SnapshotParticipant, Materialized, Dynamic)
 					}
 
-					mermaid.AddArrow(solid, string(event.TxId), readTarget, "get "+string(event.Key), materializeOpposite)
+					mermaid.AddArrow(Solid, string(event.TxId), readTarget, "get "+string(event.Key), MaterializeOpposite)
 
 					lockLevels := tx.GetLocks().GetLockLevels()
 					lockLevel := lockLevels[event.Key]
@@ -158,17 +160,21 @@ func PlayEvents(events []Event, table *Table) string {
 						mermaid.EnsureActivatedOnLevel(1, string(event.Key))
 					}
 
-					mermaid.AddArrow(solid, readTarget, string(event.TxId), fmt.Sprintf("%v = %v", event.Key, value), asMaterialized)
+					mermaid.AddArrow(Solid, readTarget, string(event.TxId), fmt.Sprintf("%v = %v", event.Key, value), AsMaterialized)
 
 				case Commit:
+					if event.Key == EmptyKey() {
+						continue
+					}
+
 					keysTouched := tx.GetKeysTouched()
 					tx.Commit()
 					for _, key := range keysTouched {
-						mermaid.AddArrow(solid, string(event.TxId), string(key), "commit", asMaterialized)
+						mermaid.AddArrow(Solid, string(event.TxId), string(key), "commit", AsMaterialized)
 					}
 
 					for _, key := range keysTouched {
-						mermaid.AddArrow(solid, string(key), string(event.TxId), "ok", asMaterialized)
+						mermaid.AddArrow(Solid, string(key), string(event.TxId), "ok", AsMaterialized)
 						mermaid.EnsureActivatedOnLevel(0, string(key))
 
 						row, ok := table.Data[key]
@@ -187,13 +193,14 @@ func PlayEvents(events []Event, table *Table) string {
 				}
 
 			}
+			return nil
 		}()
 
 	}
 
 	for _, txId := range transactionOrder {
 		close(unblocks[txId])
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(STAGGER_DELAY_MILLIS * time.Millisecond)
 	}
 
 	c := make(chan struct{})
@@ -204,10 +211,9 @@ func PlayEvents(events []Event, table *Table) string {
 
 	select {
 	case <-c:
-		return mermaid.Build()
-	case <-time.After(3 * time.Second):
-		log.Print("timed out after 3 secs")
-		return mermaid.Build()
+		return mermaid.Build(), nil
+	case <-time.After(TIMEOUT_SECS * time.Second):
+		return mermaid.Build(), fmt.Errorf("timed out after %v secs", TIMEOUT_SECS)
 	}
 }
 

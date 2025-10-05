@@ -8,24 +8,24 @@ import (
 type ParticipantType int
 
 const (
-	transactionParticipant ParticipantType = iota
-	snapshotParticipant
-	rowParticipant
+	TransactionParticipant ParticipantType = iota
+	SnapshotParticipant
+	RowParticipant
 )
 
 type ArrowType int
 
 const (
-	solid ArrowType = iota
-	dotted
+	Solid ArrowType = iota
+	Dotted
 )
 
 type ArrowMaterialization int
 
 const (
-	asMaterialized ArrowMaterialization = iota
-	asUnmaterialized
-	materializeOpposite
+	AsMaterialized ArrowMaterialization = iota
+	AsUnmaterialized
+	MaterializeOpposite
 )
 
 type ParticipantMaterialization int
@@ -87,13 +87,13 @@ func (builder *MermaidBuilder) AddArrow(arrowType ArrowType, from, to, descripti
 
 	var mermaidArrowType string
 	switch arrowType {
-	case solid:
+	case Solid:
 		mermaidArrowType = "->>"
-	case dotted:
+	case Dotted:
 		mermaidArrowType = "-->>"
 	}
 
-	if arrowMaterialization != asUnmaterialized {
+	if arrowMaterialization != AsUnmaterialized {
 		builder.participantsUsed[from] = struct{}{}
 		builder.participantsUsed[to] = struct{}{}
 	}
@@ -104,9 +104,9 @@ func (builder *MermaidBuilder) AddArrow(arrowType ArrowType, from, to, descripti
 	}
 
 	switch arrowMaterialization {
-	case asUnmaterialized:
+	case AsUnmaterialized:
 		builder.unmaterializedArrowsByFromTo[fromTo] = len(builder.diagramLines)
-	case materializeOpposite:
+	case MaterializeOpposite:
 		delete(builder.unmaterializedArrowsByFromTo, fromTo.Opposite())
 	}
 	builder.diagramLines = append(builder.diagramLines, fmt.Sprintf("%v %v %v: %v", from, mermaidArrowType, to, description))
@@ -199,17 +199,17 @@ func (builder *MermaidBuilder) reorderParticipants() []string {
 			continue
 		}
 
-		if participantType == transactionParticipant {
+		if participantType == TransactionParticipant {
 			transactions = append(transactions, participant)
 			continue
 		}
 
-		if participantType == rowParticipant {
+		if participantType == RowParticipant {
 			rows = append(rows, participant)
 			continue
 		}
 
-		if participantType == snapshotParticipant {
+		if participantType == SnapshotParticipant {
 			for _, txName := range transactions {
 				expectedPrefix := txName + " snapshot of "
 				if len(participant) > len(expectedPrefix) && participant[:len(expectedPrefix)] == expectedPrefix {
@@ -261,7 +261,7 @@ func (builder *MermaidBuilder) Build() string {
 		}
 
 		participantType, _ := builder.participantTypesByName[participant]
-		if participantType == transactionParticipant {
+		if participantType == TransactionParticipant {
 			diagram += addPrefixNewline(fmt.Sprintf("actor %v", participant))
 			continue
 		}

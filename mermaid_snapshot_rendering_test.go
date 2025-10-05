@@ -9,11 +9,14 @@ func TestDontShowSnapshotByDefault(t *testing.T) {
 	(&table).Data["x"] = NewRow("x", "1")
 
 	events := []Event{
-		NewWrite("t1", twoPhaseLocking, "x", "2"),
-		NewCommit("t1", twoPhaseLocking),
+		NewWrite("t1", TwoPhaseLockingLevel, "x", "2"),
+		NewCommit("t1", TwoPhaseLockingLevel),
 	}
 
-	productedMermaid := PlayEvents(events, &table)
+	productedMermaid, err := PlayEvents(events, &table)
+	if err != nil {
+		t.Errorf("expted PlayEvents to succeed, got error: %v", err)
+	}
 
 	expectedMermaid := `sequenceDiagram
     participant x
@@ -41,12 +44,15 @@ func TestShowSnapshotUsedForReading(t *testing.T) {
 	(&table).Data["x"] = NewRow("x", "1")
 
 	events := []Event{
-		NewWrite("t1", twoPhaseLocking, "x", "2"),
-		NewRead("t1", twoPhaseLocking, "x"),
-		NewCommit("t1", twoPhaseLocking),
+		NewWrite("t1", TwoPhaseLockingLevel, "x", "2"),
+		NewRead("t1", TwoPhaseLockingLevel, "x"),
+		NewCommit("t1", TwoPhaseLockingLevel),
 	}
 
-	productedMermaid := PlayEvents(events, &table)
+	productedMermaid, err := PlayEvents(events, &table)
+	if err != nil {
+		t.Errorf("expted PlayEvents to succeed, got error: %v", err)
+	}
 
 	expectedMermaid := `sequenceDiagram
     participant x
