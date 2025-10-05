@@ -51,8 +51,8 @@ func TestShowSnapshotUsedForReading(t *testing.T) {
 	expectedMermaid := `sequenceDiagram
     participant x
     actor t1
-    participant t1 snapshot of x
     note over x: {"Key":"x","Committed":"1","LatestUncommitted":"1","UncommittedByTxId":{}}
+    create participant t1 snapshot of x
     t1 ->> t1 snapshot of x: set x = 2
     t1 ->> x: set x = 2
     activate x
@@ -66,6 +66,7 @@ func TestShowSnapshotUsedForReading(t *testing.T) {
     deactivate x
     deactivate x
     note over x: {"Key":"x","Committed":"2","LatestUncommitted":"2","UncommittedByTxId":{}}
+    destroy t1 snapshot of x
 `
 
 	if productedMermaid != expectedMermaid {

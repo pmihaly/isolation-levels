@@ -102,8 +102,9 @@ func PlayEvents(events []Event, table *Table) string {
 					tx.Set(event.Key, event.To)
 
 					if isUsingSnapshots {
-						mermaid.EnsureParticipantAdded(toSnapshotName(event.TxId, event.Key), snapshotParticipant)
-						mermaid.AddArrow(solid, string(event.TxId), toSnapshotName(event.TxId, event.Key), fmt.Sprintf("set %v = %v", event.Key, event.To), asUnmaterialized)
+						snapshotName := toSnapshotName(event.TxId, event.Key)
+						mermaid.EnsureParticipantAddedUnmaterialized(snapshotName, snapshotParticipant)
+						mermaid.AddArrow(solid, string(event.TxId), snapshotName, fmt.Sprintf("set %v = %v", event.Key, event.To), asUnmaterialized)
 					}
 
 					mermaid.AddArrow(solid, string(event.TxId), string(event.Key), fmt.Sprintf("set %v = %v", event.Key, event.To), asMaterialized)
@@ -146,6 +147,8 @@ func PlayEvents(events []Event, table *Table) string {
 					if isUsingSnapshots && hasSnapshots {
 						readTarget = toSnapshotName(event.TxId, event.Key)
 						mermaid.EnsureParticipantAdded(readTarget, snapshotParticipant)
+						mermaid.MaterializeParticipant(readTarget)
+						mermaid.CreateParticipant(readTarget)
 					}
 
 					mermaid.AddArrow(solid, string(event.TxId), readTarget, "get "+string(event.Key), materializeOpposite)
@@ -174,6 +177,13 @@ func PlayEvents(events []Event, table *Table) string {
 						rowJson, err := json.Marshal(row)
 						if ok && err == nil {
 							mermaid.AddNote(string(key), string(rowJson))
+						}
+					}
+
+					if isUsingSnapshots {
+						for _, key := range keysTouched {
+							snapshotName := toSnapshotName(event.TxId, key)
+							mermaid.DestroyParticipant(snapshotName)
 						}
 					}
 				}

@@ -37,6 +37,8 @@ type MermaidBuilder struct {
 	participantOrder             []string
 	participantsUsed             map[string]struct{}
 	participantTypesByName       map[string]ParticipantType
+	unmaterializedParticipants   map[string]struct{}
+	dynamicallyCreated           map[string]struct{}
 }
 
 type ArrowFromTo struct {
@@ -60,6 +62,8 @@ func NewMermaidBuilder() *MermaidBuilder {
 		activationLevelByParticipant: map[string]int{},
 		participantsUsed:             make(map[string]struct{}),
 		participantTypesByName:       make(map[string]ParticipantType),
+		unmaterializedParticipants:   make(map[string]struct{}),
+		dynamicallyCreated:           make(map[string]struct{}),
 	}
 }
 
@@ -145,12 +149,63 @@ func (builder *MermaidBuilder) EnsureParticipantAdded(name string, participantTy
 	builder.participantOrder = append(builder.participantOrder, name)
 }
 
+func (builder *MermaidBuilder) EnsureParticipantAddedUnmaterialized(name string, participantType ParticipantType) {
+	builder.lock.Lock()
+	defer builder.lock.Unlock()
+	if _, alreadyAdded := builder.participantTypesByName[name]; alreadyAdded {
+		return
+	}
+	builder.participantTypesByName[name] = participantType
+	builder.participantOrder = append(builder.participantOrder, name)
+	builder.unmaterializedParticipants[name] = struct{}{}
+}
+
+func (builder *MermaidBuilder) MaterializeParticipant(name string) {
+	builder.lock.Lock()
+	defer builder.lock.Unlock()
+	delete(builder.unmaterializedParticipants, name)
+}
+
+func (builder *MermaidBuilder) CreateParticipant(name string) {
+	builder.lock.Lock()
+	defer builder.lock.Unlock()
+
+	if _, alreadyCreated := builder.dynamicallyCreated[name]; alreadyCreated {
+		return
+	}
+
+	builder.participantsUsed[name] = struct{}{}
+	builder.dynamicallyCreated[name] = struct{}{}
+	delete(builder.unmaterializedParticipants, name)
+}
+
+func (builder *MermaidBuilder) DestroyParticipant(name string) {
+	builder.lock.Lock()
+	defer builder.lock.Unlock()
+
+	if _, wasCreated := builder.dynamicallyCreated[name]; !wasCreated {
+		return
+	}
+
+	builder.diagramLines = append(builder.diagramLines, fmt.Sprintf("destroy %v", name))
+}
+
 func (builder *MermaidBuilder) Build() string {
 	diagram := "sequenceDiagram\n"
 
 	for _, participant := range builder.participantOrder {
 		_, isUsed := builder.participantsUsed[participant]
 		if !isUsed {
+			continue
+		}
+
+		_, isUnmaterialized := builder.unmaterializedParticipants[participant]
+		if isUnmaterialized {
+			continue
+		}
+
+		_, isDynamicallyCreated := builder.dynamicallyCreated[participant]
+		if isDynamicallyCreated {
 			continue
 		}
 
@@ -163,12 +218,31 @@ func (builder *MermaidBuilder) Build() string {
 		diagram += addPrefixNewline(fmt.Sprintf("participant %v", participant))
 	}
 
+	renderedCreateCommands := make(map[string]struct{})
+
 	for i, line := range builder.diagramLines {
 		arrowFromTo, isArrow := builder.arrowFromToByIndex[i]
-		_, isUnmaterialized := builder.unmaterializedArrowsByFromTo[arrowFromTo]
-		if !isArrow || !isUnmaterialized {
+
+		if !isArrow {
 			diagram += addPrefixNewline(line)
+			continue
 		}
+
+		if _, isUnmaterialized := builder.unmaterializedArrowsByFromTo[arrowFromTo]; isUnmaterialized {
+			continue
+		}
+		for _, participantName := range []string{arrowFromTo.from, arrowFromTo.to} {
+			if _, isDynamic := builder.dynamicallyCreated[participantName]; !isDynamic {
+				continue
+			}
+			if _, alreadyRendered := renderedCreateCommands[participantName]; alreadyRendered {
+				continue
+			}
+			diagram += addPrefixNewline(fmt.Sprintf("create participant %v", participantName))
+			renderedCreateCommands[participantName] = struct{}{}
+		}
+
+		diagram += addPrefixNewline(line)
 	}
 
 	return diagram
