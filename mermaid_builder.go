@@ -188,10 +188,63 @@ func (builder *MermaidBuilder) EnsureParticipantDestroyed(name string) {
 	}
 }
 
+func (builder *MermaidBuilder) reorderParticipants() []string {
+	var transactions []string
+	var rows []string
+	snapshotsByTx := make(map[string][]string)
+
+	for _, participant := range builder.participantOrder {
+		participantType, exists := builder.participantTypesByName[participant]
+		if !exists {
+			continue
+		}
+
+		if participantType == transactionParticipant {
+			transactions = append(transactions, participant)
+			continue
+		}
+
+		if participantType == rowParticipant {
+			rows = append(rows, participant)
+			continue
+		}
+
+		if participantType == snapshotParticipant {
+			for _, txName := range transactions {
+				expectedPrefix := txName + " snapshot of "
+				if len(participant) > len(expectedPrefix) && participant[:len(expectedPrefix)] == expectedPrefix {
+					snapshotsByTx[txName] = append(snapshotsByTx[txName], participant)
+					break
+				}
+			}
+		}
+	}
+
+	if len(transactions) == 0 {
+		return rows
+	}
+
+	splitPoint := (len(transactions) + 1) / 2
+	result := make([]string, 0)
+
+	for i, txName := range transactions {
+		result = append(result, txName)
+		result = append(result, snapshotsByTx[txName]...)
+
+		if i == splitPoint-1 {
+			result = append(result, rows...)
+		}
+	}
+
+	return result
+}
+
 func (builder *MermaidBuilder) Build() string {
 	diagram := "sequenceDiagram\n"
 
-	for _, participant := range builder.participantOrder {
+	orderedParticipants := builder.reorderParticipants()
+
+	for _, participant := range orderedParticipants {
 		_, isUsed := builder.participantsUsed[participant]
 		if !isUsed {
 			continue

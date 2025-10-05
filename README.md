@@ -11,9 +11,9 @@
       - [ ] strategy of operation instead of switches
       - [ ] Scheduler/Executor which handles concurrency things
         - encapsulates wg, unblocks and "var transactions sync.Map"
-    - [ ] Participants ordering
-    - [x] Mermaid: display snapshots only when reading from it
-    - [x] Mermaid snapshot rendering test: should only print dotted arrow if locked by other txn, not by itself
+    - [x] participants ordering
+    - [x] mermaid: display snapshots only when reading from it
+    - [x] mermaid snapshot rendering test: should only print dotted arrow if locked by other txn, not by itself
     - [x] snapshot creation:
       - on read/write/delete: if snapshot does not exist: read row and set snapshot value
       - https://mermaid.js.org/syntax/sequenceDiagram.html#actor-creation-and-destruction-v10-3-0
