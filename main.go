@@ -13,7 +13,6 @@ func main() {
 
 	t2 := NewReadUncommitted("2", &table)
 	t2.Set("key1", "value2")
-	t2.Delete("key1")
 	t2.Rollback()
 
 	log.Printf("data: %v", table)

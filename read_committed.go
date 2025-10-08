@@ -70,37 +70,6 @@ func (t *ReadCommitted) Get(key Key) Value {
 	return row.Committed
 }
 
-func (t *ReadCommitted) Delete(key Key) Transaction {
-	row, ok := t.Table.Data[key]
-
-	if !ok {
-		return t
-	}
-
-	didILock := t.locks.Lock(ReadWrite, t.TransactionId, &row)
-	if didILock {
-		defer t.locks.Unlock(&row)
-	}
-
-	t.Operations = append(t.Operations, Operation{
-		Key:       key,
-		FromValue: row.UncommittedByTxId[t.TransactionId],
-		ToValue:   EmptyValue(),
-	})
-
-	if _, ok := t.keysTouched[key]; ok {
-		delete(t.keysTouched, key)
-	} else {
-		t.keysTouched[key] = struct{}{}
-	}
-
-	row.LatestUncommitted = EmptyValue()
-	row.UncommittedByTxId[t.TransactionId] = EmptyValue()
-	t.Table.Data[key] = row
-
-	return t
-}
-
 func (t *ReadCommitted) Lock(key Key) Transaction {
 	row, ok := t.Table.Data[key]
 

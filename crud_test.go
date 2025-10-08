@@ -40,7 +40,7 @@ func testCrud(t *testing.T, tr Transaction) {
 		t.Errorf("got %v, want %v", value, "B")
 	}
 
-	value = tr.Delete("x").Get("x")
+	value = tr.Set("x", EmptyValue()).Get("x")
 
 	if value != EmptyValue() {
 		t.Errorf("got %v, want %v", value, EmptyValue())

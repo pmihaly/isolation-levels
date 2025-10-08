@@ -68,36 +68,6 @@ func (t *TwoPhaseLocking) Get(key Key) Value {
 	return val
 }
 
-func (t *TwoPhaseLocking) Delete(key Key) Transaction {
-	t.Table.EnsureSnapshotTaken(t.TransactionId)
-
-	row, ok := t.Table.Data[key]
-
-	if !ok {
-		return t
-	}
-
-	t.locks.Lock(ReadWrite, t.TransactionId, &row)
-
-	t.Operations = append(t.Operations, Operation{
-		Key:       key,
-		FromValue: row.UncommittedByTxId[t.TransactionId],
-		ToValue:   EmptyValue(),
-	})
-
-	if _, ok := t.keysTouched[key]; ok {
-		delete(t.keysTouched, key)
-	} else {
-		t.keysTouched[key] = struct{}{}
-	}
-
-	row.LatestUncommitted = EmptyValue()
-	row.UncommittedByTxId[t.TransactionId] = EmptyValue()
-	t.Table.Data[key] = row
-
-	return t
-}
-
 func (t *TwoPhaseLocking) Lock(key Key) Transaction {
 	t.Table.EnsureSnapshotTaken(t.TransactionId)
 

@@ -117,7 +117,6 @@ func (t *Table) GetSnapshot(txId TransactionId) (Snapshot, bool) {
 type Transaction interface {
 	Set(key Key, value Value) Transaction
 	Get(key Key) Value
-	Delete(key Key) Transaction
 	Lock(key Key) Transaction
 	Rollback() Transaction
 	Commit() Transaction
@@ -163,7 +162,6 @@ const (
 	ReadOperation
 	Commit
 	Rollback
-	Wait
 )
 
 type TableEvent struct {
